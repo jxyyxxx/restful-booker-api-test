@@ -1,0 +1,151 @@
+# ============================================================
+# 创建预订接口测试数据
+# 对应测试用例：testcases/booking/test_booking_create.py
+# 字段说明：
+#   case_name: 用例名称（会自动作为测试报告里的用例名）
+#   expected_code: 预期HTTP状态码
+#   data: 请求体数据
+# ============================================================
+
+- case_name: "正向-完整数据创建预订"
+  expected_code: 200
+  data:
+    firstname: "张三"
+    lastname: "测试"
+    totalprice: 200
+    depositpaid: true
+    bookingdates:
+      checkin: "2024-01-01"
+      checkout: "2024-01-05"
+    additionalneeds: "早餐"
+
+- case_name: "正向-完整数据创建预订-重复1"
+  expected_code: 200
+  data:
+    firstname: "张三"
+    lastname: "测试"
+    totalprice: 200
+    depositpaid: true
+    bookingdates:
+      checkin: "2024-01-01"
+      checkout: "2024-01-05"
+    additionalneeds: "早餐"
+
+- case_name: "正向-完整数据创建预订-重复2"
+  expected_code: 200
+  data:
+    firstname: "张三"
+    lastname: "测试"
+    totalprice: 200
+    depositpaid: true
+    bookingdates:
+      checkin: "2024-01-01"
+      checkout: "2024-01-05"
+    additionalneeds: "早餐"
+
+- case_name: "正向-缺少可选字段additionalneeds"
+  expected_code: 200
+  data:
+    firstname: "Alice"
+    lastname: "Smith"
+    totalprice: 500
+    depositpaid: false
+    bookingdates:
+      checkin: "2024-06-01"
+      checkout: "2024-06-10"
+
+- case_name: "正向-英文姓名创建预订"
+  expected_code: 200
+  data:
+    firstname: "John"
+    lastname: "Doe"
+    totalprice: 1000
+    depositpaid: true
+    bookingdates:
+      checkin: "2024-03-15"
+      checkout: "2024-03-20"
+    additionalneeds: "WiFi"
+
+- case_name: "正向-价格为0创建预订"
+  expected_code: 200
+  data:
+    firstname: "免费用户"
+    lastname: "测试"
+    totalprice: 0
+    depositpaid: false
+    bookingdates:
+      checkin: "2024-05-01"
+      checkout: "2024-05-02"
+
+- case_name: "正向-价格为超大数创建预订"
+  expected_code: 200
+  data:
+    firstname: "土豪用户"
+    lastname: "测试"
+    totalprice: 999999
+    depositpaid: true
+    bookingdates:
+      checkin: "2024-07-01"
+      checkout: "2024-07-31"
+    additionalneeds: "总统套房"
+
+- case_name: "正向-firstname为空创建预订"
+  expected_code: 200
+  data:
+    firstname: ""
+    lastname: "只有姓"
+    totalprice: 150
+    depositpaid: true
+    bookingdates:
+      checkin: "2024-08-01"
+      checkout: "2024-08-03"
+
+- case_name: "正向-姓名带特殊字符创建预订"
+  expected_code: 200
+  data:
+    firstname: "张@三#"
+    lastname: "测$试%"
+    totalprice: 300
+    depositpaid: true
+    bookingdates:
+      checkin: "2024-09-01"
+      checkout: "2024-09-05"
+    additionalneeds: "特殊字符测试"
+
+- case_name: "反向-缺少必填字段lastname"
+  expected_code: 500
+  data:
+    firstname: "测试无lastname"
+    totalprice: 100
+    depositpaid: true
+    bookingdates:
+      checkin: "2024-01-01"
+      checkout: "2024-01-02"
+
+- case_name: "反向-缺少必填字段totalprice"
+  expected_code: 500
+  data:
+    firstname: "测试无price"
+    lastname: "测试"
+    depositpaid: true
+    bookingdates:
+      checkin: "2024-02-01"
+      checkout: "2024-02-02"
+
+- case_name: "反向-缺少必填字段depositpaid"
+  expected_code: 500
+  data:
+    firstname: "测试无deposit"
+    lastname: "测试"
+    totalprice: 200
+    bookingdates:
+      checkin: "2024-03-01"
+      checkout: "2024-03-02"
+
+- case_name: "反向-缺少必填字段bookingdates"
+  expected_code: 500
+  data:
+    firstname: "测试无dates"
+    lastname: "测试"
+    totalprice: 200
+    depositpaid: true
