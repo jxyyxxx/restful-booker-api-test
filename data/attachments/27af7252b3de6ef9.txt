@@ -1,0 +1,4 @@
+[2026-10-09 12:18:16] [INFO] [logger.separator:111] ========== 开始执行用例：test_login[反向-用户名不存在] ==========
+[2026-10-09 12:18:16] [INFO] [http_client.request:39] 发送请求：POST http://localhost:3001/auth
+[2026-10-09 12:18:16] [INFO] [http_client.request:50] 响应状态码：200，耗时：0.001s
+[2026-10-09 12:18:16] [INFO] [conftest.log_test_case:43] 用例执行完成：test_login[反向-用户名不存在]

@@ -1,0 +1,1 @@
+{"total":2,"items":[{"uid":"a3033e098d28fe4a40b596d871acdf0c","name":"预订管理","statistic":{"failed":0,"broken":0,"skipped":0,"passed":5,"unknown":0,"total":5}},{"uid":"86779108f144b9a13fafbf89e5e62647","name":"登录认证","statistic":{"failed":0,"broken":0,"skipped":0,"passed":1,"unknown":0,"total":1}}]}
