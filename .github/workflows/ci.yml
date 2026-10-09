@@ -28,6 +28,9 @@ jobs:
       - name: 安装依赖
         run: pip install -r requirements.txt
 
+      - name: 安装 Allure 命令行工具
+        run: npm install -g allure-commandline
+
       - name: 下载并启动 restful-booker 服务
         run: |
           git clone https://github.com/mwinteringham/restful-booker.git
@@ -52,4 +55,24 @@ jobs:
           exit 1
 
       - name: 运行测试
-        run: pytest
+        run: pytest --alluredir=allure-results
+        continue-on-error: true
+
+      - name: 生成 Allure HTML 报告
+        run: allure generate allure-results -o allure-report --clean
+
+      - name: 上传测试报告和日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            allure-results
+            allure-report
+            logs
+
+      - name: 部署 Allure 报告到 GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./allure-report
