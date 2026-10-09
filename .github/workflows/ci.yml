@@ -20,8 +20,28 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
       - name: 安装依赖
         run: pip install -r requirements.txt
+
+      - name: 下载并启动 restful-booker 服务
+        run: |
+          git clone https://github.com/mwinteringham/restful-booker.git
+          cd restful-booker
+          npm install
+          npm start &
+          for i in {1..30}; do
+            if curl -s http://localhost:3001 > /dev/null; then
+              echo "服务启动成功"
+              break
+            fi
+            echo "等待服务启动... $i/30"
+            sleep 1
+          done
 
       - name: 运行测试
         run: pytest
