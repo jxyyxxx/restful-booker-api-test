@@ -33,15 +33,22 @@ jobs:
           git clone https://github.com/mwinteringham/restful-booker.git
           cd restful-booker
           npm install
-          npm start &
-          for i in {1..30}; do
-            if curl -s http://localhost:3001 > /dev/null; then
-              echo "服务启动成功"
-              break
+          npm start > restful-booker.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:3001/health > /dev/null 2>&1; then
+              echo "服务启动成功（健康检查通过）"
+              exit 0
             fi
-            echo "等待服务启动... $i/30"
+            if curl -fsS http://localhost:3001 > /dev/null 2>&1; then
+              echo "服务已响应，启动成功"
+              exit 0
+            fi
+            echo "等待服务启动... $i/60"
             sleep 1
           done
+          echo "服务启动失败，检查日志："
+          cat restful-booker.log || true
+          exit 1
 
       - name: 运行测试
         run: pytest
