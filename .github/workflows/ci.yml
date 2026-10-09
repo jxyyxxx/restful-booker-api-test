@@ -33,6 +33,7 @@ jobs:
           git clone https://github.com/mwinteringham/restful-booker.git
           cd restful-booker
           npm install
+          npm install uuid@9.0.1
           npm start > restful-booker.log 2>&1 &
           for i in $(seq 1 60); do
             if curl -fsS http://localhost:3001/health > /dev/null 2>&1; then
