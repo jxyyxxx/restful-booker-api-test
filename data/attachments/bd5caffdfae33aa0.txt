@@ -1,4 +1,0 @@
-[2026-10-09 12:18:16] [INFO] ========== 开始执行用例：test_create_booking[反向-缺少必填字段lastname] ==========
-[2026-10-09 12:18:16] [INFO] 发送请求：POST http://localhost:3001/booking
-[2026-10-09 12:18:16] [INFO] 响应状态码：500，耗时：0.002s
-[2026-10-09 12:18:16] [INFO] 用例执行完成：test_create_booking[反向-缺少必填字段lastname]
