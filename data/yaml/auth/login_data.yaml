@@ -1,5 +1,5 @@
 # ============================================================
-# 登录接口测试数据
+# 登录接口测试数据（共 14 条）
 # 对应测试用例：testcases/test_auth.py
 # 字段说明：
 #   case_name: 用例名称（会自动作为测试报告里的用例名）
@@ -7,21 +7,13 @@
 #   password: 密码
 #   expected_code: 预期HTTP状态码
 #   expected_success: 预期是否登录成功（true/false）
+# 设计说明：
+#   restful-booker 的 /auth 无论成功失败都返回 200，失败时响应体是 {"reason": "Bad credentials"}，
+#   所以反向用例要断言 expected_code=200 + expected_success=false（用例里进一步校验 reason 字段）。
+#   每条数据都必须对应一个不同的场景（等价类 / 边界值 / 异常输入），不要用重复数据凑条数。
 # ============================================================
 
 - case_name: "正向-登录成功"
-  username: "admin"
-  password: "password123"
-  expected_code: 200
-  expected_success: true
-
-- case_name: "正向-登录成功-重复验证1"
-  username: "admin"
-  password: "password123"
-  expected_code: 200
-  expected_success: true
-
-- case_name: "正向-登录成功-重复验证2"
   username: "admin"
   password: "password123"
   expected_code: 200

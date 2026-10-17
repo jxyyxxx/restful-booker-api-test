@@ -18,7 +18,7 @@ login_data, login_ids = data_loader.get_test_data("auth/login_data.yaml")
 class TestAuth:
     """登录接口测试"""
 
-    @allure.title("登录测试-{case_name}")
+    @allure.title("登录测试")
     @allure.description("登录接口参数化测试，覆盖正向和反向场景")
     @pytest.mark.parametrize("test_data", login_data, ids=login_ids)
     def test_login(self, test_data):
@@ -32,6 +32,11 @@ class TestAuth:
         expected_code = test_data["expected_code"]
         expected_success = test_data["expected_success"]
         case_name = test_data["case_name"]
+
+        # 动态设置 Allure 报告标题：
+        # 参数化传进来的是整个 dict，@allure.title 里的 {case_name} 取不到 dict 内部字段，
+        # 报告里会原样显示成 "登录测试-{case_name}"，所以只能在用例运行时设置
+        allure.dynamic.title(f"登录测试-{case_name}")
 
         # 1. 调用登录接口
         res = auth_api.login(username, password)

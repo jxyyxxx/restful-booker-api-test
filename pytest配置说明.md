@@ -1,6 +1,6 @@
 # pytest.ini 配置说明
 
-pytest 运行时自动读取这个文件，控制测试的运行规则。
+pytest 运行时自动读取这个文件，控制测试的运行规则。本文档与 `pytest.ini` 逐项对应，改配置时请同步改这里。
 
 ---
 
@@ -43,10 +43,11 @@ pytest -m booking  # 只跑标记了 booking 的用例
 ### `addopts = -v --alluredir=reports/allure-results --clean-alluredir`
 默认命令行参数，每次运行 `pytest` 自动带上，不用每次手动敲：
 - `-v`：显示详细输出（每条用例的名字和结果）
-- `--alluredir=reports/allure-results`：生成 Allure 结果文件（JSON 格式），存到指定目录
+- `--alluredir=reports/allure-results`：生成 Allure 结果文件（JSON 格式）到指定目录
 - `--clean-alluredir`：运行前先清空旧的结果文件，避免历史数据干扰
 
-> 注意：这里只生成 Allure 的 JSON 结果文件，HTML 报告由 conftest.py 里的 `pytest_sessionfinish` 钩子在测试结束后自动调用 `allure generate` 生成。
+> 这是 Allure 结果目录的**唯一真源**：本地 `conftest.py` 的钩子、CI 里的 `allure generate` 都读这个目录，
+> 命令里不要再额外传 `--alluredir`，否则会出现两份结果、报告内容对不上。
 
 ---
 
@@ -69,3 +70,20 @@ pytest -m booking  # 只跑标记了 booking 的用例
 - `log_date_format = %Y-%m-%d %H:%M:%S`：日志里时间的显示格式
 
 > 注意：这里配置的是 pytest 自带的日志输出，和项目里 `common/logger.py` 封装的日志工具是两套东西。pytest 的 log_cli 负责把用例里打日志实时显示到控制台，`common/logger.py` 负责把日志同时输出到控制台和文件。两者配合使用。
+
+---
+
+## 与 conftest.py 的配合关系
+
+`conftest.py` 里有一个会话结束钩子 `pytest_sessionfinish`，负责在测试跑完后：
+
+1. 调 `allure generate reports/allure-results -o reports/allure-html --clean` 生成 HTML 报告；
+2. 调 `allure open reports/allure-html` 在浏览器打开。
+
+**CI 环境下这个钩子会直接返回**（判断环境变量 `CI`），因为：
+
+- GitHub Actions 里没有浏览器可开；
+- workflow 已经显式执行了一次 `allure generate`，本地钩子再跑一遍属于重复劳动，还可能写坏同一份报告；
+- `allure open` 会起一个常驻服务并继承 stdout，会把采集日志的管道挂住。
+
+所以在 Jenkins、GitLab CI 等其他平台运行时，请显式设置 `CI=true`，让报告统一由流水线生成。

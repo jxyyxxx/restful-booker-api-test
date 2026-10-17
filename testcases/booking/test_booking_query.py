@@ -33,11 +33,14 @@ class TestBookingQuery:
         for item in res_json:
             assert_utils.assert_field_exists(item, "bookingid")
 
-    @allure.title("查询预订详情-{case_name}")
+    @allure.title("查询预订详情")
     @allure.description("查询预订详情，覆盖正常ID和不存在的ID")
     @pytest.mark.parametrize("test_data", booking_query_data, ids=booking_query_ids)
     def test_booking_detail(self, test_data):
         """查询预订详情，覆盖正常ID和不存在的ID"""
+        # 动态设置 Allure 报告标题：原因同 test_auth.py，占位符取不到 dict 内部字段
+        allure.dynamic.title(f"查询预订详情-{test_data['case_name']}")
+
         booking_id = test_data["booking_id"]
         expected_code = test_data["expected_code"]
 

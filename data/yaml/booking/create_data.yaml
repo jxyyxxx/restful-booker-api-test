@@ -1,37 +1,20 @@
 # ============================================================
-# 创建预订接口测试数据
+# 创建预订接口测试数据（共 11 条）
 # 对应测试用例：testcases/booking/test_booking_create.py
 # 字段说明：
 #   case_name: 用例名称（会自动作为测试报告里的用例名）
 #   expected_code: 预期HTTP状态码
 #   data: 请求体数据
+# 设计说明：
+#   正向覆盖「必填齐全」「可选字段缺失」「零值 / 超大值 / 空字符串 / 特殊字符」等边界；
+#   反向逐个删掉一个必填字段（lastname / totalprice / depositpaid / bookingdates），
+#   restful-booker 校验失败时返回 500。每条数据对应一个独立场景，不用重复数据凑条数。
+# 注意：
+#   创建成功的用例会在用例内自动删除自己创建的预订（见 test_booking_create.py 的 finally 分支），
+#   否则每跑一轮就会往系统里堆数据，影响后续用例与性能测试结果。
 # ============================================================
 
 - case_name: "正向-完整数据创建预订"
-  expected_code: 200
-  data:
-    firstname: "张三"
-    lastname: "测试"
-    totalprice: 200
-    depositpaid: true
-    bookingdates:
-      checkin: "2024-01-01"
-      checkout: "2024-01-05"
-    additionalneeds: "早餐"
-
-- case_name: "正向-完整数据创建预订-重复1"
-  expected_code: 200
-  data:
-    firstname: "张三"
-    lastname: "测试"
-    totalprice: 200
-    depositpaid: true
-    bookingdates:
-      checkin: "2024-01-01"
-      checkout: "2024-01-05"
-    additionalneeds: "早餐"
-
-- case_name: "正向-完整数据创建预订-重复2"
   expected_code: 200
   data:
     firstname: "张三"
