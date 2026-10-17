@@ -1,15 +1,43 @@
+# ============================================================
+# CI：接口自动化测试流水线
+# 触发：push 到 main、PR、手动、每天定时
+# 流程：装依赖 → 拉起被测服务 → pytest → allure generate → 归档 → 发布 Pages
+# 设计原则：
+#   1. 用例失败必须让流水线变红，绝不 continue-on-error（否则"绿"没有意义）
+#   2. 报告归档用 if: always()，失败也要能看到现场
+#   3. 报告发布只在用例通过时进行，避免线上红了还把"绿色报告"推出去
+#   4. allure generate 只在这里执行一次；本地由 conftest 钩子负责，CI 下跳过
+# ============================================================
+
 name: CI
 
 on:
+  # 保持原来"任何分支 push 都跑"的行为，PR 也会跑
   push:
+  pull_request:
   workflow_dispatch:
   schedule:
-    # 每天 08:00（北京时间）触发；GitHub Actions 用 UTC，故写 0:00 (=北京时间 08:00)
+    # 每天 08:00（北京时间）触发；GitHub Actions 用 UTC，故写 0:00
     - cron: '0 0 * * *'
+
+# 同一分支的新提交取消上一次未跑完的流水线，避免排队占资源、报告互相覆盖
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# 发布 gh-pages 需要写权限；新版仓库默认 token 只读，不声明会直接 403
+permissions:
+  contents: write
+
+env:
+  SERVICE_DIR: service
+  ALLURE_RESULTS: reports/allure-results
+  BASE_URL: http://localhost:3001
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: 拉取代码
@@ -19,60 +47,71 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: pip
 
       - name: 安装 Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
 
-      - name: 安装依赖
+      - name: 安装测试依赖
         run: pip install -r requirements.txt
 
       - name: 安装 Allure 命令行工具
-        run: npm install -g allure-commandline
+        run: npm install -g allure-commandline@2.30.0
 
       - name: 下载并启动 restful-booker 服务
         run: |
-          git clone https://github.com/mwinteringham/restful-booker.git
-          cd restful-booker
+          set -euo pipefail
+          git clone --depth 1 https://github.com/mwinteringham/restful-booker.git "$SERVICE_DIR"
+          echo "被测服务 commit：$(git -C "$SERVICE_DIR" rev-parse --short HEAD)"
+          cd "$SERVICE_DIR"
           npm install
+          # 固定 uuid 9.x：新版 uuid 是 ESM，CommonJS 风格的 restful-booker 直接 require 会崩
           npm install uuid@9.0.1
-          npm start > restful-booker.log 2>&1 &
+          nohup npm start > ../service.log 2>&1 &
+
           for i in $(seq 1 60); do
-            if curl -fsS http://localhost:3001/health > /dev/null 2>&1; then
-              echo "服务启动成功（健康检查通过）"
-              exit 0
-            fi
-            if curl -fsS http://localhost:3001 > /dev/null 2>&1; then
-              echo "服务已响应，启动成功"
+            if curl -fsS "$BASE_URL" > /dev/null 2>&1; then
+              echo "服务启动成功（第 ${i} 秒响应正常）"
               exit 0
             fi
             echo "等待服务启动... $i/60"
             sleep 1
           done
-          echo "服务启动失败，检查日志："
-          cat restful-booker.log || true
+          echo "::error::restful-booker 60 秒内未启动，以下是服务日志"
+          cat ../service.log || true
           exit 1
 
-      - name: 运行测试
-        run: pytest --alluredir=allure-results
-        continue-on-error: true
+      - name: 运行接口自动化测试
+        run: pytest -q
 
-      - name: 生成 Allure HTML 报告
-        run: allure generate allure-results -o allure-report --clean
+      - name: 生成 Allure 报告
+        if: always()
+        run: |
+          if [ -n "$(ls -A "$ALLURE_RESULTS" 2>/dev/null || true)" ]; then
+            allure generate "$ALLURE_RESULTS" -o allure-report --clean
+          else
+            echo "::warning::没有采集到 Allure 结果文件，跳过报告生成"
+          fi
 
-      - name: 上传测试报告和日志
+      - name: 上传测试报告与日志
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-reports
+          name: test-reports-${{ github.run_attempt }}
           path: |
-            allure-results
+            reports/allure-results
             allure-report
             logs
+            service.log
+          if-no-files-found: warn
 
-      - name: 部署 Allure 报告到 GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+      - name: 发布 Allure 报告到 GitHub Pages
+        # 只在 main 上用例全绿时发布：分支/PR 没有写权限，失败的报告也不该推到线上
+        if: success() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./allure-report
+          commit_message: 'ci: 更新 Allure 报告 (${{ github.sha }})'

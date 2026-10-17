@@ -107,7 +107,14 @@ def pytest_sessionfinish(session, exitstatus):
     1. 调用 allure generate 生成 HTML 报告
     2. 自动在浏览器中打开报告
     不管跑全部还是单个用例，结束后都会自动生成报告
+
+    CI 环境下直接跳过：GitHub Actions 没有浏览器可开，且 workflow 里已经显式
+    执行了一次 allure generate，这里再生成一遍只会拖慢流水线、还可能写坏同一份报告。
     """
+    if os.getenv("CI"):
+        logger.info("检测到 CI 环境，跳过本地 allure generate / allure open，报告由 workflow 生成")
+        return
+
     results_dir = "reports/allure-results"
     report_dir = "reports/allure-html"
     report_index = os.path.join(report_dir, "index.html")
