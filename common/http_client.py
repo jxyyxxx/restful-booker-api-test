@@ -5,6 +5,7 @@
 # ============================================================
 
 import time
+import allure
 import requests
 from config.settings import BASE_URL, REQUEST_TIMEOUT
 from common.logger import logger
@@ -34,32 +35,36 @@ class HttpClient:
         # 记录请求开始时间
         start_time = time.time()
 
-        try:
-            # 记录请求日志
-            logger.info(f"发送请求：{method} {url}")
-            if "json" in kwargs:
-                logger.debug(f"请求体：{kwargs['json']}")
+        # 把这次调用包成一个 Allure 步骤：
+        # 报告里会显示成 "POST /auth" 这样的节点，用例失败时能直接看出是哪个接口、
+        # 哪一步出的问题，而不是只看到一个 assert 行号
+        with allure.step(f"{method} {path}"):
+            try:
+                # 记录请求日志
+                logger.info(f"发送请求：{method} {url}")
+                if "json" in kwargs:
+                    logger.debug(f"请求体：{kwargs['json']}")
 
-            # 发送请求
-            res = self.session.request(method, url, **kwargs)
+                # 发送请求
+                res = self.session.request(method, url, **kwargs)
 
-            # 计算耗时
-            elapsed = round(time.time() - start_time, 3)
+                # 计算耗时
+                elapsed = round(time.time() - start_time, 3)
 
-            # 记录响应日志
-            logger.info(f"响应状态码：{res.status_code}，耗时：{elapsed}s")
-            logger.debug(f"响应体：{res.text[:500]}")
+                # 记录响应日志
+                logger.info(f"响应状态码：{res.status_code}，耗时：{elapsed}s")
+                logger.debug(f"响应体：{res.text[:500]}")
 
-            return res
-        except requests.exceptions.Timeout:
-            logger.error(f"请求超时：{url}，超过 {REQUEST_TIMEOUT} 秒")
-            raise
-        except requests.exceptions.ConnectionError:
-            logger.error(f"连接失败：{url}，请检查服务是否启动")
-            raise
-        except Exception as e:
-            logger.error(f"请求异常：{e}")
-            raise
+                return res
+            except requests.exceptions.Timeout:
+                logger.error(f"请求超时：{url}，超过 {REQUEST_TIMEOUT} 秒")
+                raise
+            except requests.exceptions.ConnectionError:
+                logger.error(f"连接失败：{url}，请检查服务是否启动")
+                raise
+            except Exception as e:
+                logger.error(f"请求异常：{e}")
+                raise
 
     # 封装常用的五种请求方式，用例层直接调用
     def get(self, path, **kwargs):

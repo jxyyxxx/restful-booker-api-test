@@ -11,6 +11,7 @@ import subprocess
 import pytest
 from common.api.auth_api import auth_api
 from common.api.booking_api import booking_api
+from common.allure_report import set_default_language
 from common.http_client import http
 from common.logger import logger
 from common.utils import utils
@@ -191,6 +192,12 @@ def pytest_sessionfinish(session, exitstatus):
     except subprocess.CalledProcessError as e:
         logger.error(f"Allure 报告生成失败：{e}")
         return
+
+    # 报告默认语言设为中文（CI 里由 workflow 的同名步骤完成）
+    if set_default_language(report_dir):
+        logger.info("报告默认语言已设为中文，打开即中文界面")
+    else:
+        logger.warning("报告结构不符，跳过默认语言设置")
 
     # 自动打开浏览器（用 allure open 启动本地 HTTP 服务，避免 file:// 协议加载失败）
     if os.path.exists(report_index):

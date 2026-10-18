@@ -95,6 +95,15 @@ jobs:
             echo "::warning::没有采集到 Allure 结果文件，跳过报告生成"
           fi
 
+      - name: 设置报告默认语言为中文
+        if: always()
+        run: |
+          if [ -f allure-report/index.html ]; then
+            python -m common.allure_report allure-report
+          else
+            echo "::warning::报告未生成，跳过默认语言设置"
+          fi
+
       - name: 上传测试报告与日志
         if: always()
         uses: actions/upload-artifact@v4
