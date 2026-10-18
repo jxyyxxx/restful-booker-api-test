@@ -6,14 +6,14 @@
 
 import time
 import requests
-from config.settings import ENV_CONFIG, ENV, REQUEST_TIMEOUT
+from config.settings import BASE_URL, REQUEST_TIMEOUT
 from common.logger import logger
 
 
 class HttpClient:
     def __init__(self):
-        # 从配置层读取当前环境的 base_url
-        self.base_url = ENV_CONFIG[ENV]["base_url"]
+        # base_url 由配置层统一导出：环境变量 BASE_URL > local 默认值
+        self.base_url = BASE_URL
         # 使用 Session 保持会话，自动管理 Cookie（登录后的 token 自动带上）
         self.session = requests.Session()
 

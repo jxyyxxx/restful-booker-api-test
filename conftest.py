@@ -13,7 +13,7 @@ from common.api.booking_api import booking_api
 from common.http_client import http
 from common.logger import logger
 from common.utils import utils
-from config.settings import ENV_CONFIG, ENV
+from config.settings import BASE_URL, ADMIN_USER, ADMIN_PWD, ENV
 
 
 # ------------------------------------------------------------
@@ -25,7 +25,7 @@ def check_env_health():
     """测试开始前自动检查服务是否正常"""
     logger.separator("开始环境健康检查")
     logger.info(f"当前环境：{ENV}")
-    logger.info(f"接口地址：{ENV_CONFIG[ENV]['base_url']}")
+    logger.info(f"接口地址：{BASE_URL}")
     logger.separator()
     yield
     logger.separator("全部测试执行完毕")
@@ -56,10 +56,7 @@ def admin_login():
     登录后 token 自动存入 Session 的 Cookie，后续请求自动带上
     """
     logger.info("执行管理员登录...")
-    token = auth_api.get_token(
-        ENV_CONFIG[ENV]["admin_user"],
-        ENV_CONFIG[ENV]["admin_pwd"]
-    )
+    token = auth_api.get_token(ADMIN_USER, ADMIN_PWD)
 
     # 把 token 存入 Session 的 Cookie，后续请求自动带上
     # restful-booker 的认证方式是 Cookie: token=xxx

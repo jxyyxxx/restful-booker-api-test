@@ -1,24 +1,34 @@
 # ============================================================
 # 配置层：所有环境配置、全局常量统一放这里
-# 作用：切换环境时只改 ENV 一个变量，用例代码完全不用动
+# 设计要点：
+#   1. 环境由环境变量 ENV 决定，默认 local；白名单校验，写错环境名直接报错
+#   2. base_url / 管理员账号支持环境变量覆盖，切环境不用改代码
+#      （CI 的 workflow 里声明了 BASE_URL，这里读取后那行才真正生效）
 # ============================================================
 
-# 当前运行环境：local=本地Docker/Node部署，online=在线环境
-ENV = "local"
+import os
 
-# 各环境的配置字典
+# 允许的环境白名单。本项目只跑本地服务（npm start 或 docker compose），不再保留在线环境
+ALLOWED_ENVS = ("local",)
+
+# 当前运行环境：local = 本地 restful-booker（默认 http://localhost:3001）
+ENV = os.getenv("ENV", "local")
+if ENV not in ALLOWED_ENVS:
+    raise ValueError(f"未知环境 ENV={ENV}，可选值：{ALLOWED_ENVS}")
+
+# 各环境的默认配置（单项可被同名环境变量覆盖，见下方导出的变量）
 ENV_CONFIG = {
     "local": {
-        "base_url": "http://localhost:3001",       # 本地restful-booker地址
-        "admin_user": "admin",                        # 管理员账号
-        "admin_pwd": "password123",                   # 管理员密码
+        "base_url": "http://localhost:3001",       # 本地 restful-booker 地址
+        "admin_user": "admin",                     # 管理员账号
+        "admin_pwd": "password123",                # 管理员密码
     },
-    "online": {
-        "base_url": "https://restful-booker.herokuapp.com",  # 在线环境
-        "admin_user": "admin",
-        "admin_pwd": "password123",
-    }
 }
+
+# 对外导出的最终配置：优先级 环境变量 > ENV_CONFIG 默认值
+BASE_URL = os.getenv("BASE_URL", ENV_CONFIG[ENV]["base_url"])
+ADMIN_USER = os.getenv("ADMIN_USER", ENV_CONFIG[ENV]["admin_user"])
+ADMIN_PWD = os.getenv("ADMIN_PWD", ENV_CONFIG[ENV]["admin_pwd"])
 
 # 全局通用配置
 REQUEST_TIMEOUT = 10          # 请求超时时间（秒）
