@@ -1,17 +1,19 @@
 # ============================================================
 # CI：接口自动化测试流水线
 #
-# 触发与执行广度（分层）：
-#   push / 定时 / 手动  → 全量用例（40 条）
-#   pull_request        → 冒烟集（6 条，约 0.4 秒）
-# 报告左侧「环境」面板里的 scope 会随之显示 full / smoke，可直接区分。
+# 触发与执行广度：
+#   pull_request        → 冒烟集（6 条）
+#   push / 定时         → 全量（40 条）
+#   手动（运行工作流程）→ 下拉框自选：
+#        执行范围 scope: full（全量 40 条）/ smoke（冒烟 6 条）
+#        Python 版本 python: 3.11（默认）/ 3.13
+#   冒烟/全量会写进报告「环境」面板的 scope 字段，看报告即可区分。
 #
 # 稳定性设计：
 #   1. 被测服务锁定 commit（SERVICE_COMMIT），避免上游 main 变动导致流水线随机变红
 #   2. 依赖走 requirements.lock 精确版本，上游发版不影响构建
-#   3. Python 3.11 / 3.13 双版本矩阵，覆盖 CI 与本地版本差异
-#   4. 用例失败必须让流水线变红（不加 continue-on-error）；报告归档用 if: always()
-#   5. 报告只在 main + 全绿 + 3.11 这一格发布，避免矩阵两次重复推送 gh-pages
+#   3. 用例失败必须让流水线变红（不加 continue-on-error）；报告归档用 if: always()
+#   4. 线上报告只发布"全量"结果：手动跑冒烟不覆盖 gh-pages，避免链接里只剩 6 条
 # ============================================================
 
 name: CI
@@ -20,7 +22,23 @@ on:
   # 保持"任何分支 push 都跑"的行为，PR 也会跑
   push:
   pull_request:
+  # 手动触发：页面上点「运行工作流程」，选执行范围与 Python 版本
   workflow_dispatch:
+    inputs:
+      scope:
+        description: '执行范围：full=全量 40 条，smoke=冒烟集 6 条'
+        type: choice
+        options:
+          - full
+          - smoke
+        default: full
+      python:
+        description: 'Python 版本'
+        type: choice
+        options:
+          - '3.11'
+          - '3.13'
+        default: '3.11'
   schedule:
     # 每天 08:00（北京时间）触发；GitHub Actions 用 UTC，故写 0:00
     - cron: '0 0 * * *'
@@ -41,26 +59,22 @@ env:
   SERVICE_COMMIT: 00461155995c8636866bf51dc444f63033da44fb
   ALLURE_RESULTS: reports/allure-results
   BASE_URL: http://localhost:3001
+  # 默认 3.11；手动触发且选择了版本时以手动为准
+  PY_VERSION: ${{ inputs.python || '3.11' }}
 
 jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
-    strategy:
-      # 一个 Python 版本失败不影响另一个继续跑，方便对比版本差异
-      fail-fast: false
-      matrix:
-        python-version: ['3.11', '3.13']
-
     steps:
       - name: 拉取代码
         uses: actions/checkout@v4
 
-      - name: 安装 Python ${{ matrix.python-version }}
+      - name: 安装 Python ${{ env.PY_VERSION }}
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ env.PY_VERSION }}
           cache: pip
 
       - name: 安装 Node.js
@@ -104,8 +118,18 @@ jobs:
         if: github.event_name == 'pull_request'
         run: pytest -m smoke -q
 
-      - name: 运行测试（push / 定时 / 手动：全量）
-        if: github.event_name != 'pull_request'
+      - name: 运行测试（手动：按选择的范围）
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "手动触发：scope=${{ inputs.scope }}，python=${{ env.PY_VERSION }}"
+          if [ "${{ inputs.scope }}" = "smoke" ]; then
+            pytest -m smoke -q
+          else
+            pytest -q
+          fi
+
+      - name: 运行测试（push / 定时：全量）
+        if: github.event_name != 'pull_request' && github.event_name != 'workflow_dispatch'
         run: pytest -q
 
       - name: 生成 Allure 报告
@@ -130,7 +154,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-reports-py${{ matrix.python-version }}-${{ github.run_attempt }}
+          name: test-reports-py${{ env.PY_VERSION }}-${{ github.run_attempt }}
           path: |
             reports/allure-results
             allure-report
@@ -139,8 +163,8 @@ jobs:
           if-no-files-found: warn
 
       - name: 发布 Allure 报告到 GitHub Pages
-        # 矩阵里只让 3.11 这一格发布，否则两次推送会互相覆盖 gh-pages
-        if: success() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && matrix.python-version == '3.11'
+        # 只发布 main 上的全量结果：PR、手动冒烟都不覆盖线上报告
+        if: success() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.scope == 'full')
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
