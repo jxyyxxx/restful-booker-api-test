@@ -23,7 +23,8 @@ restful-booker_测试框架/
 ├── .github/workflows/
 │   └── ci.yml                  # CI 流水线：拉起被测服务 → 跑用例 → 发布 Allure 报告
 ├── config/                     # 1️⃣ 配置层
-│   └── settings.py             # 环境配置（仅 local，支持环境变量覆盖）、超时、日志配置
+│   ├── settings.py             # 环境配置（仅 local，支持环境变量覆盖）、超时、日志配置
+│   └── allure_categories.json  # Allure 失败分类规则（跑测试时拷进结果目录）
 ├── common/                     # 2️⃣ 工具层
 │   ├── http_client.py          # HTTP 请求统一封装（Session 自动管理 Cookie）
 │   ├── utils.py                # 通用工具（随机数据生成等）
@@ -231,6 +232,43 @@ Allure 标题用 `allure.dynamic.title(f"...-{case_name}")` 在用例内部设�
 2. **`--strict-markers` 只管装饰器，不管命令行**。写 `@pytest.mark.smooke` 会直接报错；但 `pytest -m smooke` 不会被拦住，结果是 `40 deselected` + 退出码 5（"没收集到用例"）——CI 照样会红，只是提示不如前者清楚。
 
 当前 CI 仍然跑全量：40 条只要 0.7 秒，分层省不出时间。标记是为了以后用例变多、需要"push 跑冒烟、定时跑全量"时准备好的。
+
+---
+
+## Allure 报告里能看到什么
+
+报告的可读性靠三块元数据，由 `conftest.py` 在会话结束时写入（本地与 CI 同样生效）：
+
+| 位置 | 数据来源 | 能看到什么 |
+|------|----------|-----------|
+| 左侧「环境」面板 | `reports/allure-results/environment.properties` | 被测地址、环境名、Python / pytest 版本、操作系统，**以及本次执行范围** |
+| 「分类」页 | `config/allure_categories.json`（跑测试时拷进结果目录，生成成 `categories.json`） | 失败自动归为「断言失败（功能不符合预期）」「响应时间门禁超限」「被测服务不可用 / 连接异常」 |
+| 「严重级别」视图 | 用例类上的 `@allure.severity` | 核心链路标 `CRITICAL`（`/ping` 探活、登录、创建），其余标 `NORMAL` |
+| 概览 / 套件 | 用例的 feature / story / 动态标题 | 按「健康检查 / 登录认证 / 预订管理」分组，用例名带 `case_name` |
+
+### 报告里怎么区分「冒烟」和「全量」
+
+不用手动标注，`scope` 字段是从 pytest 命令行自动推断的：
+
+| 命令 | scope | markexpr | collected |
+|------|-------|----------|-----------|
+| `pytest` | `full` | `(none)` | 40 |
+| `pytest -m smoke` | `smoke` | `smoke` | 6 |
+| `pytest -m "not smoke"` | `filtered` | `not smoke` | 34 |
+
+所以同一个报告链接，冒烟跑和全量跑在「环境」面板里一眼可辨：
+
+```
+env=local
+base_url=http://localhost:3001
+scope=smoke
+markexpr=smoke
+collected=6
+response_time_limit_s=0.5
+```
+
+> 需要注意：CI 目前固定跑全量，所以线上报告通常是 `scope=full / collected=40`；
+> 只有在本地手动跑 `-m smoke` 或未来给 CI 加分阶段后，才会出现 `scope=smoke`。
 
 ---
 

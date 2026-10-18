@@ -11,6 +11,7 @@ from common.assert_utils import assert_utils
 
 @allure.feature("预订管理")
 @allure.story("修改预订")
+@allure.severity(allure.severity_level.NORMAL)
 @pytest.mark.booking
 class TestBookingUpdate:
     """修改预订接口测试"""

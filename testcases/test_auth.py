@@ -15,6 +15,7 @@ login_data, login_ids = data_loader.get_test_data("auth/login_data.yaml")
 
 @allure.feature("登录认证")
 @allure.story("登录接口")
+@allure.severity(allure.severity_level.CRITICAL)
 @pytest.mark.auth
 class TestAuth:
     """登录接口测试"""

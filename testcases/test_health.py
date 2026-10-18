@@ -13,6 +13,7 @@ from common.http_client import http
 
 @allure.feature("健康检查")
 @allure.story("/ping")
+@allure.severity(allure.severity_level.CRITICAL)
 @pytest.mark.smoke
 class TestHealth:
     """被测服务健康检查"""

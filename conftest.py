@@ -5,6 +5,7 @@
 # ============================================================
 
 import os
+import platform
 import shutil
 import subprocess
 import pytest
@@ -13,7 +14,7 @@ from common.api.booking_api import booking_api
 from common.http_client import http
 from common.logger import logger
 from common.utils import utils
-from config.settings import BASE_URL, ADMIN_USER, ADMIN_PWD, ENV
+from config.settings import BASE_URL, ADMIN_USER, ADMIN_PWD, ENV, RESPONSE_TIME_LIMIT
 
 
 # ------------------------------------------------------------
@@ -96,18 +97,73 @@ def test_booking(admin_login):
 
 
 # ------------------------------------------------------------
-# 5. pytest 钩子：测试会话结束后自动生成 Allure 报告并打开
+# 5. 写 Allure 报告的环境面板与失败分类
+#    注意：必须在 CI 提前返回之前执行——CI 里报告由 workflow 生成，
+#    同样需要 results 目录里的 environment.properties 和 categories.json
+# ------------------------------------------------------------
+def _write_allure_metadata(session):
+    """
+    往 reports/allure-results 写两份元数据：
+
+    1. environment.properties —— Allure 报告左侧「环境」面板的数据源，
+       会显示被测地址、Python/pytest 版本、操作系统，以及本次执行范围
+    2. categories.json —— 失败分类规则，报告里的「分类」页靠它把失败归到
+       「断言失败 / 响应时间门禁超限 / 被测服务不可用」
+
+    执行范围是自动推断的：pytest 的 -m 表达式存在就记为 filtered/smoke，
+    没有 -m/-k 就记为 full，所以冒烟跑和全量跑在报告里能直接区分开。
+    """
+    results_dir = "reports/allure-results"
+    os.makedirs(results_dir, exist_ok=True)
+
+    # 本次执行范围：-m smoke → smoke；无过滤 → full；其他表达式 → filtered
+    markexpr = (getattr(session.config.option, "markexpr", "") or "").strip()
+    keyword = (getattr(session.config.option, "keyword", "") or "").strip()
+    if not markexpr and not keyword:
+        scope = "full"
+    elif markexpr in ("smoke", "booking", "auth", "regression"):
+        scope = markexpr
+    elif markexpr:
+        scope = "filtered"
+    else:
+        scope = "filtered"
+
+    lines = [
+        ("env", ENV),
+        ("base_url", BASE_URL),
+        ("scope", scope),
+        ("markexpr", markexpr or "(none)"),
+        ("keyword", keyword or "(none)"),
+        ("collected", str(session.testscollected)),
+        ("python", platform.python_version()),
+        ("pytest", pytest.__version__),
+        ("os", platform.platform()),
+        ("response_time_limit_s", f"{RESPONSE_TIME_LIMIT:g}"),
+    ]
+    with open(os.path.join(results_dir, "environment.properties"), "w", encoding="utf-8") as f:
+        for key, value in lines:
+            f.write(f"{key}={value}\n")
+
+    # 失败分类：仓库里维护规则，跑测试时拷进结果目录
+    categories_src = os.path.join("config", "allure_categories.json")
+    if os.path.exists(categories_src):
+        shutil.copyfile(categories_src, os.path.join(results_dir, "categories.json"))
+
+
+# ------------------------------------------------------------
+# 6. pytest 钩子：测试会话结束后自动生成 Allure 报告并打开
 # ------------------------------------------------------------
 def pytest_sessionfinish(session, exitstatus):
     """
     测试会话结束后自动执行：
-    1. 调用 allure generate 生成 HTML 报告
-    2. 自动在浏览器中打开报告
-    不管跑全部还是单个用例，结束后都会自动生成报告
+    1. 写入 Allure 报告的环境面板与失败分类（本地和 CI 都需要）
+    2. 调用 allure generate 生成 HTML 报告并打开（仅本地）
 
-    CI 环境下直接跳过：GitHub Actions 没有浏览器可开，且 workflow 里已经显式
+    CI 环境下跳过第 2 步：GitHub Actions 没有浏览器可开，且 workflow 里已经显式
     执行了一次 allure generate，这里再生成一遍只会拖慢流水线、还可能写坏同一份报告。
     """
+    _write_allure_metadata(session)
+
     if os.getenv("CI"):
         logger.info("检测到 CI 环境，跳过本地 allure generate / allure open，报告由 workflow 生成")
         return

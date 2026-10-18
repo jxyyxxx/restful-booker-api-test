@@ -15,6 +15,7 @@ booking_query_data, booking_query_ids = data_loader.get_test_data("booking/query
 
 @allure.feature("预订管理")
 @allure.story("查询预订")
+@allure.severity(allure.severity_level.NORMAL)
 @pytest.mark.booking
 class TestBookingQuery:
     """预订查询接口测试"""

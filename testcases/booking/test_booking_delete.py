@@ -12,6 +12,7 @@ from common.utils import utils
 
 @allure.feature("预订管理")
 @allure.story("删除预订")
+@allure.severity(allure.severity_level.NORMAL)
 @pytest.mark.booking
 class TestBookingDelete:
     """删除预订接口测试"""

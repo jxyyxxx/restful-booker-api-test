@@ -1,0 +1,17 @@
+[
+  {
+    "name": "断言失败（功能不符合预期）",
+    "matchedStatuses": ["failed"],
+    "messageRegex": ".*AssertionError.*"
+  },
+  {
+    "name": "响应时间门禁超限",
+    "matchedStatuses": ["failed"],
+    "messageRegex": ".*响应时间超限.*"
+  },
+  {
+    "name": "被测服务不可用 / 连接异常",
+    "matchedStatuses": ["broken", "failed"],
+    "messageRegex": ".*(ConnectionError|连接失败|Max retries|NewConnectionError).*"
+  }
+]
