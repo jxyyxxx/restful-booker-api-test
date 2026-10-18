@@ -1,0 +1,25 @@
+# 依赖锁：由干净虚拟环境解析出的精确版本（Python 3.13 / Linux 与 Windows 通用）
+# 用途：CI 用 `pip install -r requirements.lock` 安装，保证每次构建依赖完全一致，
+#      不会因为上游发小版本把流水线打红；本地开发可继续用 requirements.txt 的范围。
+# 更新方式（PowerShell）：
+#   python -m venv .lockenv
+#   .lockenv\Scripts\pip install -U pip
+#   .lockenv\Scripts\pip install -r requirements.txt
+#   .lockenv\Scripts\pip freeze > requirements.lock
+# 更新后请本地跑一遍全量用例再提交。
+
+allure-pytest==2.16.2
+allure-python-commons==2.16.2
+attrs==26.1.0
+certifi==2026.7.22
+charset-normalizer==3.5.2
+colorama==0.4.6
+idna==3.20
+iniconfig==2.3.1
+packaging==26.3
+pluggy==1.7.0
+Pygments==2.21.0
+pytest==9.1.1
+PyYAML==6.0.3
+requests==2.34.2
+urllib3==2.8.0

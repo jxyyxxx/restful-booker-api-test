@@ -1,18 +1,23 @@
 # ============================================================
 # CI：接口自动化测试流水线
-# 触发：push 到 main、PR、手动、每天定时
-# 流程：装依赖 → 拉起被测服务 → pytest → allure generate → 归档 → 发布 Pages
-# 设计原则：
-#   1. 用例失败必须让流水线变红，绝不 continue-on-error（否则"绿"没有意义）
-#   2. 报告归档用 if: always()，失败也要能看到现场
-#   3. 报告发布只在用例通过时进行，避免线上红了还把"绿色报告"推出去
-#   4. allure generate 只在这里执行一次；本地由 conftest 钩子负责，CI 下跳过
+#
+# 触发与执行广度（分层）：
+#   push / 定时 / 手动  → 全量用例（40 条）
+#   pull_request        → 冒烟集（6 条，约 0.4 秒）
+# 报告左侧「环境」面板里的 scope 会随之显示 full / smoke，可直接区分。
+#
+# 稳定性设计：
+#   1. 被测服务锁定 commit（SERVICE_COMMIT），避免上游 main 变动导致流水线随机变红
+#   2. 依赖走 requirements.lock 精确版本，上游发版不影响构建
+#   3. Python 3.11 / 3.13 双版本矩阵，覆盖 CI 与本地版本差异
+#   4. 用例失败必须让流水线变红（不加 continue-on-error）；报告归档用 if: always()
+#   5. 报告只在 main + 全绿 + 3.11 这一格发布，避免矩阵两次重复推送 gh-pages
 # ============================================================
 
 name: CI
 
 on:
-  # 保持原来"任何分支 push 都跑"的行为，PR 也会跑
+  # 保持"任何分支 push 都跑"的行为，PR 也会跑
   push:
   pull_request:
   workflow_dispatch:
@@ -31,22 +36,31 @@ permissions:
 
 env:
   SERVICE_DIR: service
+  SERVICE_REPO: https://github.com/mwinteringham/restful-booker.git
+  # 被测服务锁定版本：0046115 是 2026-10 的 main 提交，升级前请先在本地跑一遍全量
+  SERVICE_COMMIT: 00461155995c8636866bf51dc444f63033da44fb
   ALLURE_RESULTS: reports/allure-results
   BASE_URL: http://localhost:3001
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+
+    strategy:
+      # 一个 Python 版本失败不影响另一个继续跑，方便对比版本差异
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.13']
 
     steps:
       - name: 拉取代码
         uses: actions/checkout@v4
 
-      - name: 安装 Python
+      - name: 安装 Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
           cache: pip
 
       - name: 安装 Node.js
@@ -54,16 +68,19 @@ jobs:
         with:
           node-version: '18'
 
-      - name: 安装测试依赖
-        run: pip install -r requirements.txt
+      - name: 安装测试依赖（锁定版本）
+        run: |
+          pip install -r requirements.lock
+          pip check
 
       - name: 安装 Allure 命令行工具
         run: npm install -g allure-commandline@2.30.0
 
-      - name: 下载并启动 restful-booker 服务
+      - name: 下载并启动 restful-booker 服务（锁定 commit）
         run: |
           set -euo pipefail
-          git clone --depth 1 https://github.com/mwinteringham/restful-booker.git "$SERVICE_DIR"
+          git clone "$SERVICE_REPO" "$SERVICE_DIR"
+          git -C "$SERVICE_DIR" checkout --detach "$SERVICE_COMMIT"
           echo "被测服务 commit：$(git -C "$SERVICE_DIR" rev-parse --short HEAD)"
           cd "$SERVICE_DIR"
           npm install
@@ -83,7 +100,12 @@ jobs:
           cat ../service.log || true
           exit 1
 
-      - name: 运行接口自动化测试
+      - name: 运行测试（PR：冒烟集）
+        if: github.event_name == 'pull_request'
+        run: pytest -m smoke -q
+
+      - name: 运行测试（push / 定时 / 手动：全量）
+        if: github.event_name != 'pull_request'
         run: pytest -q
 
       - name: 生成 Allure 报告
@@ -108,7 +130,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-reports-${{ github.run_attempt }}
+          name: test-reports-py${{ matrix.python-version }}-${{ github.run_attempt }}
           path: |
             reports/allure-results
             allure-report
@@ -117,8 +139,8 @@ jobs:
           if-no-files-found: warn
 
       - name: 发布 Allure 报告到 GitHub Pages
-        # 只在 main 上用例全绿时发布：分支/PR 没有写权限，失败的报告也不该推到线上
-        if: success() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        # 矩阵里只让 3.11 这一格发布，否则两次推送会互相覆盖 gh-pages
+        if: success() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && matrix.python-version == '3.11'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

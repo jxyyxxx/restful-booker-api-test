@@ -58,7 +58,8 @@ restful-booker_测试框架/
 ├── pytest.ini                  # pytest 核心配置
 ├── run.py                      # 9️⃣ 执行入口（封装配置好的 pytest 命令）
 ├── pytest配置说明.md            # pytest.ini 逐项说明
-├── requirements.txt
+├── requirements.txt            # 开发期依赖范围（下界/上界）
+├── requirements.lock           # 依赖锁：CI 用的精确版本
 └── README.md
 ```
 
@@ -106,10 +107,13 @@ npm start
 ### 2. 安装测试依赖
 
 ```cmd
-pip install -r requirements.txt
+pip install -r requirements.txt          # 本地开发：范围安装（下界/上界）
+pip install -r requirements.lock         # 想和 CI 完全一致：精确版本
 ```
 
-> 版本范围写在 `requirements.txt` 里：下界是代码实际用到的最低版本，上界是下一个大版本——既避免上游破坏性变更把 CI 打红，又不限制补丁级升级。升级大版本时同步改上界，并本地跑一遍全量验证。
+> 版本范围写在 `requirements.txt` 里：下界是代码实际用到的最低版本，上界是下一个大版本——既避免上游破坏性变更打红，又不限制补丁升级。
+> `requirements.lock` 是干净环境解析出的精确版本，CI 装的是它；升级依赖时先改 `requirements.txt`，再用锁文件流程重新生成
+> （步骤见 `requirements.lock` 头部注释），本地跑一遍全量再提交。
 
 ### 3. 安装 Allure 命令行工具（生成 HTML 报告需要，需 Java 环境）
 
@@ -291,8 +295,8 @@ collected=6
 response_time_limit_s=0.5
 ```
 
-> 需要注意：CI 目前固定跑全量，所以线上报告通常是 `scope=full / collected=40`；
-> 只有在本地手动跑 `-m smoke` 或未来给 CI 加分阶段后，才会出现 `scope=smoke`。
+> 需要注意：CI 里 PR 跑冒烟、push 与定时跑全量，所以同一个链接上的 `scope` 会在 `smoke` 与 `full` 之间切换，
+> 看报告前先瞄一眼环境面板就知道这份报告覆盖了多少条用例。
 
 ---
 
@@ -300,17 +304,26 @@ response_time_limit_s=0.5
 
 `.github/workflows/ci.yml`
 
-**触发方式**：任意分支 `push`、`pull_request`、`workflow_dispatch`（手动）、每天 00:00 UTC（北京时间 08:00）定时。
+**触发方式与执行广度（分层）**：
+
+| 事件 | 跑什么 | 报告 scope |
+|------|--------|-----------|
+| `push`（任意分支） | 全量 40 条 | `full` |
+| `pull_request` | 冒烟集 6 条（约 0.4 秒） | `smoke` |
+| `schedule`（每天 00:00 UTC = 北京 08:00） | 全量 40 条 | `full` |
+| `workflow_dispatch`（手动） | 全量 40 条 | `full` |
+
+PR 只跑冒烟是为了给提交快速反馈；`main` 的 push 与定时任务仍跑全量，保证线上报告是完整结果。
 
 **执行步骤**：
 
-1. checkout → 安装 Python 3.11（带 pip 缓存）、Node.js 18
-2. `pip install -r requirements.txt`、`npm install -g allure-commandline@2.30.0`
-3. 克隆并启动 restful-booker（打印被测服务 commit；60 秒内未响应则输出 `::error::` 并打印服务日志后失败）
-4. `pytest -q`（Allure 结果目录由 `pytest.ini` 的 `addopts` 决定，CI 不重复传参）
+1. checkout → 安装 Python（**3.11 / 3.13 双版本矩阵**，带 pip 缓存）、Node.js 18
+2. `pip install -r requirements.lock && pip check`（**锁定版本**安装，不使用 requirements.txt 的范围）、`npm install -g allure-commandline@2.30.0`
+3. 克隆 restful-booker 并 `checkout` 到 **固定 commit**（`SERVICE_COMMIT`），再启动服务；打印被测服务 commit，60 秒内未响应则输出 `::error::` 并打印服务日志后失败
+4. 按事件选择测试范围：PR 跑 `pytest -m smoke -q`，其余跑 `pytest -q`（Allure 结果目录由 `pytest.ini` 的 `addopts` 决定，CI 不重复传参）
 5. `allure generate` 生成 HTML 报告
 6. `python -m common.allure_report allure-report` 把报告默认语言设为中文
-7. 上传 artifact：`reports/allure-results`、`allure-report`、`logs`、`service.log`
+7. 上传 artifact：`reports/allure-results`、`allure-report`、`logs`、`service.log`（文件名带 Python 版本，避免矩阵互相覆盖）
 8. 发布到 GitHub Pages（`gh-pages` 分支）
 
 **关键约定**：
@@ -318,8 +331,11 @@ response_time_limit_s=0.5
 | 约定 | 原因 |
 |------|------|
 | 测试步骤**不加** `continue-on-error` | 用例失败必须让流水线变红，否则"绿色"没有信息量 |
+| 被测服务**锁定 commit** | 上游 main 随时会变，不锁的话流水线会"自己变红"，且失败原因无法复现 |
+| 依赖走 `requirements.lock` | 上游发小版本不影响构建；`requirements.txt` 只做开发期的范围声明 |
+| Python **双版本矩阵**（3.11 / 3.13） | 本地 3.13、CI 原本只有 3.11，版本差异导致的偶发问题只能在 CI 暴露 |
 | 报告归档用 `if: always()` | 用例失败时也要能拿到现场（结果、日志、服务输出） |
-| 只发布成功的报告，且仅限 `main` 分支 | 失败的报告不该覆盖线上；PR / 分支没有写权限 |
+| 只发布成功的报告，且仅限 `main` + `3.11` 这一格 | 失败的报告不该覆盖线上；矩阵里只让一格发布，避免两次推送互相覆盖 gh-pages |
 | `permissions: contents: write` | 推送 `gh-pages` 需要写权限，新版仓库默认 token 只读 |
 | `concurrency` 取消过期运行 | 同一分支连续提交时，旧流水线占资源且报告互相覆盖 |
 
