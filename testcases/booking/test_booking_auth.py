@@ -8,6 +8,7 @@ import pytest
 from common.api.booking_api import booking_api
 from common.assert_utils import assert_utils
 from common.http_client import http
+from common.logger import logger
 from common.utils import utils
 
 
@@ -47,7 +48,11 @@ class TestBookingAuth:
             for key, value in original_cookies.items():
                 http.session.cookies.set(key, value)
 
-            # 清理测试数据，并断言确实删掉了，避免静默泄漏
+            # 清理测试数据：只记录结果、不 assert。
+            # 这段在 finally 里，若 assert 失败会覆盖用例原本的失败原因，
+            # 导致报告显示"清理失败"，而真正的 403 断言失败被藏起来
             delete_res = booking_api.delete_booking(booking_id)
-            assert delete_res.status_code == 201, \
-                f"测试数据清理失败，预订 ID={booking_id} 未删除，状态码：{delete_res.status_code}"
+            if delete_res.status_code != 201:
+                logger.error(
+                    f"测试数据清理失败，预订 ID={booking_id} 未删除，状态码：{delete_res.status_code}"
+                )

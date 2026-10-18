@@ -40,12 +40,12 @@ restful-booker_测试框架/
 │       ├── auth/login_data.yaml          # 登录 14 条
 │       └── booking/
 │           ├── create_data.yaml          # 创建 11 条
-│           └── query_data.yaml           # 查询 8 条
+│           └── query_data.yaml           # 查询 7 条（均为不存在的 ID）
 ├── testcases/                  # 5️⃣ 用例层（按功能细分）
 │   ├── test_health.py          # 健康检查 1 条（/ping，冒烟集第一条）
 │   ├── test_auth.py            # 登录 15 条（14 参数化 + 1 条 token 格式）
 │   └── booking/
-│       ├── test_booking_query.py    # 查询 9 条（列表 1 + 详情 8）
+│       ├── test_booking_query.py    # 查询 9 条（列表 1 + 自建详情 1 + 不存在 ID 7）
 │       ├── test_booking_create.py   # 创建 11 条
 │       ├── test_booking_update.py   # 修改 2 条（PUT + PATCH）
 │       ├── test_booking_delete.py   # 删除 1 条
@@ -153,7 +153,6 @@ BASE_URL=http://192.168.1.20:3001 pytest -q
 
 | fixture | 作用域 | 说明 |
 |---------|--------|------|
-| `check_env_health` | session | 会话开始时打印当前环境与接口地址（`autouse=True` 自动执行） |
 | `log_test_case` | function | 每个用例开始/结束打分隔日志（`autouse=True` 自动执行） |
 | `admin_login` | session | 管理员登录一次，把 token 写入 `Session.cookies`，后续请求自动带认证 |
 | `test_booking` | function | 用 `yield` 实现前置造数 + 后置清理：用例前创建一条预订并返回 ID，用例结束后删除（用例失败也执行） |
@@ -176,13 +175,19 @@ Allure 标题用 `allure.dynamic.title(f"...-{case_name}")` 在用例内部设�
 
 ### 4. 日志系统
 每次请求记录 URL、方法、请求体、状态码、响应体（截断 500 字符）、耗时；日志文件按环境+时间命名，方便按次排查。
+请求体与响应体在写日志前会做**脱敏**（`password` / `token` / `authorization` / `cookie` → `***`），避免 `/auth` 的明文密码落进日志文件。
 
 ### 5. 测试数据自动回收
-两条回收路径：
-- `test_booking` fixture 的 `yield` 后置清理（修改类用例）；
-- 创建类用例在 `finally` 里删除自己创建的预订，并显式断言删除成功。
+三条回收路径：
+
+- `test_booking` fixture 的 `yield` 后置清理（查询详情、修改类用例）；
+- 创建类用例在 `finally` 里删除自己创建的预订；
+- 会失败中断的用例（如删除、未认证 403）在 `finally` 里做一次**兜底删除**，避免用例中途失败留下脏数据。
 
 不回收的后果很具体：每跑一轮就往系统里堆 9 条左右的预订，`GET /booking` 的响应体越来越大，后续用例和性能测试都会被污染（这一点在性能测试报告里被单独记为"测试自污染"）。
+
+> 正向用例全部**自己造数据**（列表、详情都先建一条再查），不依赖服务启动时的种子数据——
+> 否则换一种启动方式（不设 `SEED=true`）就会出现"ID=1 查不到"的假失败。
 
 ### 6. 用例按功能细分
 一个测试文件只测一个功能，职责单一，好找好改。
@@ -204,7 +209,7 @@ Allure 标题用 `allure.dynamic.title(f"...-{case_name}")` 在用例内部设�
 |------|------|------|------|----------|
 | 健康检查 | `test_health.py` | 1 | `smoke` | `/ping` 返回 201（非 200），确认服务在线，同时校验响应时间门禁 |
 | 登录 | `test_auth.py` | 15 | `auth` + `smoke`×1 | 正向登录、密码错误（含空/简单密码）、用户名空/空格/不存在、用户名密码均错、特殊字符、超长输入；token 格式校验 |
-| 查询 | `test_booking_query.py` | 9 | `booking` + `smoke`×1 | 列表非空且每条含 `bookingid`；详情覆盖 ID=1、不存在 ID、0、负数、超大值 |
+| 查询 | `test_booking_query.py` | 9 | `booking` + `smoke`×1 | 列表：自建数据后查列表，非空且每条含 `bookingid`；详情：自建数据查自己（200）+ 7 条不存在/非法 ID（404：0、负数、超大值） |
 | 创建 | `test_booking_create.py` | 11 | `booking` | 完整数据、缺可选字段、英文姓名、价格 0/超大值、firstname 空、特殊字符；逐个缺必填字段（期望 500） |
 | 修改 | `test_booking_update.py` | 2 | `booking` + `smoke`×2 | PUT 全量修改；PATCH 只改部分字段并验证未改字段不变 |
 | 删除 | `test_booking_delete.py` | 1 | `booking` + `smoke`×1 | 删除返回 201，删除后查询返回 404 |
@@ -227,6 +232,9 @@ Allure 标题用 `allure.dynamic.title(f"...-{case_name}")` 在用例内部设�
 
 **冒烟集 = `/ping` 探活 + 正向登录（token 格式）+ 查询列表 + PUT 全量修改 + PATCH 部分修改 + 删除**，跑一遍等于先确认服务在线，再走完「登录 → 创建 → 查询 → 修改 → 删除」主链路（创建由 `test_booking` fixture 间接触发），耗时约 0.4 秒。
 
+> `/ping` 之所以能排在最前面，是因为 `conftest.py` 里的 `pytest_collection_modifyitems` 把健康检查模块提到收集结果的最前；
+> 否则按文件名排序它会排在最后，服务挂掉时先红的就是几十条连接失败。
+
 两个容易踩的点：
 
 1. **冒烟标记只打在非参数化函数上**。参数化用例（登录 14 条、创建 11 条、查询详情 8 条）不能整体打 `smoke`，否则 14 条登录数据会全部变成冒烟，粒度就废了。想精确到某一条参数，得在数据和标记之间打通（如 `pytest.param(..., marks=...)`），成本不划算，所以用"圈定非参数化主链路"的方式。
@@ -244,7 +252,7 @@ Allure 标题用 `allure.dynamic.title(f"...-{case_name}")` 在用例内部设�
 |------|----------|-----------|
 | 用例步骤 | `http_client.py`、`assert_utils.py` 里的 `allure.step` | 点开一条用例，能看到「POST /auth → 断言：状态码 == 200 → 断言：字段 token 存在」这样的步骤链，失败时直接定位到哪一步 |
 | 左侧「环境」面板 | `reports/allure-results/environment.properties` | 被测地址、环境名、Python / pytest 版本、操作系统，**以及本次执行范围** |
-| 「分类」页 | `config/allure_categories.json`（跑测试时拷进结果目录，生成成 `categories.json`） | 失败自动归为「断言失败（功能不符合预期）」「响应时间门禁超限」「被测服务不可用 / 连接异常」 |
+| 「分类」页 | `config/allure_categories.json`（跑测试时拷进结果目录，生成成 `categories.json`） | 失败自动归为「响应时间门禁超限」「被测服务不可用 / 连接异常」「断言失败（功能不符合预期）」；三条规则互斥（"断言失败"用负向断言排除了时延超限），不会一条失败同时进两个分类 |
 | 「严重级别」视图 | 用例类上的 `@allure.severity` | 核心链路标 `CRITICAL`（`/ping` 探活、登录、创建），其余标 `NORMAL` |
 | 概览 / 套件 | 用例的 feature / story / 动态标题 | 按「健康检查 / 登录认证 / 预订管理」分组，用例名带 `case_name` |
 

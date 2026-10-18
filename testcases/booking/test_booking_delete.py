@@ -31,14 +31,22 @@ class TestBookingDelete:
         create_res = booking_api.create_booking(create_data)
         booking_id = create_res.json()["bookingid"]
 
-        # 2. 执行删除
-        delete_res = booking_api.delete_booking(booking_id)
-        # restful-booker 删除成功返回 201
-        assert delete_res.status_code == 201, \
-            f"删除失败，状态码：{delete_res.status_code}（restful-booker 删除成功返回201）"
-        assert_utils.assert_response_time(delete_res, label=f"DELETE /booking/{booking_id}")
+        try:
+            # 2. 执行删除
+            delete_res = booking_api.delete_booking(booking_id)
+            # restful-booker 删除成功返回 201
+            assert delete_res.status_code == 201, \
+                f"删除失败，状态码：{delete_res.status_code}（restful-booker 删除成功返回201）"
+            assert_utils.assert_response_time(delete_res, label=f"DELETE /booking/{booking_id}")
 
-        # 3. 验证删除后查询不到
-        query_res = booking_api.get_booking_detail(booking_id)
-        assert_utils.assert_status_code(query_res, 404)
-        assert_utils.assert_response_time(query_res, label=f"GET /booking/{booking_id}（删除后）")
+            # 3. 验证删除后查询不到
+            query_res = booking_api.get_booking_detail(booking_id)
+            assert_utils.assert_status_code(query_res, 404)
+            assert_utils.assert_response_time(query_res, label=f"GET /booking/{booking_id}（删除后）")
+        finally:
+            # 兜底清理：上面任何一步失败（比如删除返回 403）都会留下这条预订，
+            # 这里再删一次；已经删掉的再删只会返回 404，属于预期，忽略即可
+            try:
+                booking_api.delete_booking(booking_id)
+            except Exception:
+                pass

@@ -19,22 +19,19 @@ from config.settings import BASE_URL, ADMIN_USER, ADMIN_PWD, ENV, RESPONSE_TIME_
 
 
 # ------------------------------------------------------------
-# 1. 环境健康检查：autouse=True，所有测试自动执行
-#    scope="session"：整个测试会话只执行1次
+# 0. 收集阶段：把健康检查（/ping）提到最前面
+#    目的：服务没起来时先红在探活这一条上，而不是让后面 30 多条用例
+#    集体报连接错误；全量与冒烟集都生效
 # ------------------------------------------------------------
-@pytest.fixture(autouse=True, scope="session")
-def check_env_health():
-    """测试开始前自动检查服务是否正常"""
-    logger.separator("开始环境健康检查")
-    logger.info(f"当前环境：{ENV}")
-    logger.info(f"接口地址：{BASE_URL}")
-    logger.separator()
-    yield
-    logger.separator("全部测试执行完毕")
+def pytest_collection_modifyitems(session, config, items):
+    health = [item for item in items if "test_health" in item.nodeid]
+    if health:
+        rest = [item for item in items if item not in health]
+        items[:] = health + rest
 
 
 # ------------------------------------------------------------
-# 2. 每个用例的开始/结束日志：autouse=True，自动执行
+# 1. 每个用例的开始/结束日志：autouse=True，自动执行
 #    scope="function"：每个测试函数执行1次
 # ------------------------------------------------------------
 @pytest.fixture(autouse=True, scope="function")
