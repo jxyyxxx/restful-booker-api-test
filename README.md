@@ -9,7 +9,7 @@
 
 | 项目 | 说明 |
 |------|------|
-| 用例规模 | 39 条（参数化执行，覆盖登录 14 + 创建 11 + 查询 8 + 独立用例 6） |
+| 用例规模 | 40 条（参数化执行，覆盖登录 14 + 创建 11 + 查询 8 + 独立用例 7） |
 | 技术栈 | Python 3.11 / pytest / requests / PyYAML / Allure / GitHub Actions |
 | 被测系统 | restful-booker（Node.js + Express + LokiJS 内存数据库，8 个接口） |
 | 报告 | Allure（本地生成 + CI 自动发布到 GitHub Pages） |
@@ -40,6 +40,7 @@ restful-booker_测试框架/
 │           ├── create_data.yaml          # 创建 11 条
 │           └── query_data.yaml           # 查询 8 条
 ├── testcases/                  # 5️⃣ 用例层（按功能细分）
+│   ├── test_health.py          # 健康检查 1 条（/ping，冒烟集第一条）
 │   ├── test_auth.py            # 登录 15 条（14 参数化 + 1 条 token 格式）
 │   └── booking/
 │       ├── test_booking_query.py    # 查询 9 条（列表 1 + 详情 8）
@@ -76,7 +77,7 @@ restful-booker_测试框架/
 
 | 接口 | 方法 | 说明 | 是否需要认证 |
 |------|------|------|--------------|
-| `/ping` | GET | 健康检查（仅性能测试用到） | 否 |
+| `/ping` | GET | 健康检查（返回 **201**，不是 200；已覆盖用例） | 否 |
 | `/auth` | POST | 登录获取 token | 否 |
 | `/booking` | GET | 查询预订列表 | 否 |
 | `/booking/{id}` | GET | 查询预订详情 | 否 |
@@ -119,8 +120,8 @@ allure --version
 
 ```cmd
 python run.py                 # 入口文件，等价于 pytest
-pytest                        # 全量，39 条
-pytest -m smoke               # 冒烟集，5 条（主链路，0.4 秒）
+pytest                        # 全量，40 条
+pytest -m smoke               # 冒烟集，6 条（探活 + 主链路，0.4 秒）
 pytest -m booking             # 预订模块，24 条
 pytest -m auth                # 登录模块，15 条
 pytest testcases/booking/     # 按目录跑
@@ -184,12 +185,22 @@ Allure 标题用 `allure.dynamic.title(f"...-{case_name}")` 在用例内部设�
 ### 6. 用例按功能细分
 一个测试文件只测一个功能，职责单一，好找好改。
 
+### 7. 响应时间门禁
+`AssertUtils.assert_response_time()` 给关键接口加了单次耗时上限：默认 500ms，可用环境变量 `RESPONSE_TIME_LIMIT` 覆盖。
+
+- **覆盖范围**：`/ping`、`/auth`、查询列表与详情、创建、PUT、PATCH、删除、未认证 403；
+- **失败信息**：带实际耗时与阈值，例如 `响应时间超限：GET /ping 耗时 7ms，超过阈值 0.1ms`；
+- **阈值为什么取 500ms**：本地实测 2~20ms，留了一个数量级以上的余量——既能拦住明显劣化（比如某次改动让接口从 5ms 涨到 800ms），又不会因为 CI 机器抖动误报。
+
+它让功能用例同时具备"对不对"和"快不快"两个维度，与 JMeter 的性能测试形成互补：这边拦**回归劣化**，那边测**容量上限**。
+
 ---
 
-## 用例清单与规模（共 39 条）
+## 用例清单与规模（共 40 条）
 
 | 模块 | 文件 | 条数 | 标记 | 覆盖内容 |
 |------|------|------|------|----------|
+| 健康检查 | `test_health.py` | 1 | `smoke` | `/ping` 返回 201（非 200），确认服务在线，同时校验响应时间门禁 |
 | 登录 | `test_auth.py` | 15 | `auth` + `smoke`×1 | 正向登录、密码错误（含空/简单密码）、用户名空/空格/不存在、用户名密码均错、特殊字符、超长输入；token 格式校验 |
 | 查询 | `test_booking_query.py` | 9 | `booking` + `smoke`×1 | 列表非空且每条含 `bookingid`；详情覆盖 ID=1、不存在 ID、0、负数、超大值 |
 | 创建 | `test_booking_create.py` | 11 | `booking` | 完整数据、缺可选字段、英文姓名、价格 0/超大值、firstname 空、特殊字符；逐个缺必填字段（期望 500） |
@@ -207,19 +218,19 @@ Allure 标题用 `allure.dynamic.title(f"...-{case_name}")` 在用例内部设�
 
 | 标记 | 打在哪 | 命中条数 | 命令 |
 |------|--------|----------|------|
-| `smoke` | 主链路 5 条用例 | 5 | `pytest -m smoke` |
+| `smoke` | 探活 + 主链路 6 条用例 | 6 | `pytest -m smoke` |
 | `booking` | 5 个预订模块测试类（类级） | 24 | `pytest -m booking` |
 | `auth` | 登录模块测试类（类级） | 15 | `pytest -m auth` |
 | `regression` | 预留，暂未使用 | 0 | — |
 
-**冒烟集 = 正向登录（token 格式）+ 查询列表 + PUT 全量修改 + PATCH 部分修改 + 删除**，跑一遍等于走完「登录 → 创建 → 查询 → 修改 → 删除」主链路（创建由 `test_booking` fixture 间接触发），耗时约 0.4 秒。
+**冒烟集 = `/ping` 探活 + 正向登录（token 格式）+ 查询列表 + PUT 全量修改 + PATCH 部分修改 + 删除**，跑一遍等于先确认服务在线，再走完「登录 → 创建 → 查询 → 修改 → 删除」主链路（创建由 `test_booking` fixture 间接触发），耗时约 0.4 秒。
 
 两个容易踩的点：
 
 1. **冒烟标记只打在非参数化函数上**。参数化用例（登录 14 条、创建 11 条、查询详情 8 条）不能整体打 `smoke`，否则 14 条登录数据会全部变成冒烟，粒度就废了。想精确到某一条参数，得在数据和标记之间打通（如 `pytest.param(..., marks=...)`），成本不划算，所以用"圈定非参数化主链路"的方式。
-2. **`--strict-markers` 只管装饰器，不管命令行**。写 `@pytest.mark.smooke` 会直接报错；但 `pytest -m smooke` 不会被拦住，结果是 `39 deselected` + 退出码 5（"没收集到用例"）——CI 照样会红，只是提示不如前者清楚。
+2. **`--strict-markers` 只管装饰器，不管命令行**。写 `@pytest.mark.smooke` 会直接报错；但 `pytest -m smooke` 不会被拦住，结果是 `40 deselected` + 退出码 5（"没收集到用例"）——CI 照样会红，只是提示不如前者清楚。
 
-当前 CI 仍然跑全量：39 条只要 0.7 秒，分层省不出时间。标记是为了以后用例变多、需要"push 跑冒烟、定时跑全量"时准备好的。
+当前 CI 仍然跑全量：40 条只要 0.7 秒，分层省不出时间。标记是为了以后用例变多、需要"push 跑冒烟、定时跑全量"时准备好的。
 
 ---
 

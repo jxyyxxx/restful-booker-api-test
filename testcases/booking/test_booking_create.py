@@ -30,6 +30,7 @@ class TestBookingCreate:
         res = booking_api.create_booking(case["data"])
         try:
             assert_utils.assert_status_code(res, case["expected_code"])
+            assert_utils.assert_response_time(res, label="POST /booking")
 
             # 成功时验证创建结果
             if case["expected_code"] == 200:

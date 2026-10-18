@@ -40,6 +40,7 @@ class TestBookingAuth:
             # 未登录修改应该失败
             res = booking_api.update_booking(booking_id, create_data)
             assert_utils.assert_status_code(res, 403)
+            assert_utils.assert_response_time(res, label="PUT /booking/{id} 未认证")
         finally:
             # 恢复 Cookie（token 回来了，后面的删除才有权限）
             for key, value in original_cookies.items():

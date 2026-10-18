@@ -29,7 +29,7 @@ pytest 运行时自动读取这个文件，控制测试的运行规则。本文�
 ### `markers`
 自定义测试标记，用来给用例分类，运行时可以用 `-m` 筛选。
 ```bash
-pytest -m smoke    # 只跑主链路冒烟集（5 条）
+pytest -m smoke    # 只跑主链路冒烟集（6 条）
 pytest -m booking  # 只跑预订模块（24 条）
 pytest -m auth     # 只跑登录模块（15 条）
 pytest -m "not smoke"   # 反向筛选：跳过冒烟集
@@ -38,7 +38,7 @@ pytest -m "not smoke"   # 反向筛选：跳过冒烟集
 
 | 标记 | 打在哪 | 命中条数 | 说明 |
 |------|--------|----------|------|
-| `smoke` | 5 个非参数化主链路用例（函数级） | 5 | 正向登录、查询列表、PUT 修改、PATCH 修改、删除；创建由 fixture 间接触发 |
+| `smoke` | 探活 + 5 个非参数化主链路用例（函数级） | 6 | `/ping` 探活、正向登录、查询列表、PUT 修改、PATCH 修改、删除；创建由 fixture 间接触发 |
 | `booking` | 5 个预订模块测试类（类级） | 24 | 查询 / 创建 / 修改 / 删除 / 未认证 |
 | `auth` | `TestAuth` 测试类（类级） | 15 | 登录模块全部用例 |
 | `regression` | 预留，暂未使用 | 0 | 需要"全量回归"语义时再用 |
@@ -58,7 +58,7 @@ pytest -m "not smoke"   # 反向筛选：跳过冒烟集
 
 **`--strict-markers` 的边界**（容易误解）：它只校验代码里 `@pytest.mark.xxx` 的装饰器名。
 写 `@pytest.mark.smooke` 会立刻报错；但命令行 `pytest -m smooke` **不会**被它拦住——
-那会得到 `39 deselected`、退出码 5（pytest 的"没收集到用例"专用码），CI 依然会判红，只是提示没那么直观。
+那会得到 `40 deselected`、退出码 5（pytest 的"没收集到用例"专用码），CI 依然会判红，只是提示没那么直观。
 
 > 注意：这里只生成 Allure 的 JSON 结果文件，HTML 报告由 conftest.py 里的 `pytest_sessionfinish` 钩子在测试结束后自动调用 `allure generate` 生成（CI 环境下该钩子会跳过，由 workflow 生成）。
 >

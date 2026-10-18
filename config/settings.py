@@ -33,6 +33,11 @@ ADMIN_PWD = os.getenv("ADMIN_PWD", ENV_CONFIG[ENV]["admin_pwd"])
 # 全局通用配置
 REQUEST_TIMEOUT = 10          # 请求超时时间（秒）
 
+# 响应时间门禁：单次请求耗时的上限（秒），可用环境变量 RESPONSE_TIME_LIMIT 覆盖
+# 取值说明：本地实测平均 2~20ms，500ms 约为实测值的 25 倍以上，
+# 既能拦住真正的性能劣化，又不会因为 CI 机器抖动误报
+RESPONSE_TIME_LIMIT = float(os.getenv("RESPONSE_TIME_LIMIT", "0.5"))
+
 # 日志配置
 LOG_CONFIG = {
     "log_dir": "logs",                    # 日志文件存放目录

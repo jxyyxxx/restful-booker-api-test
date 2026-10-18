@@ -62,6 +62,7 @@ class TestAuth:
         """正向登录，验证返回的 token 格式正确"""
         res = auth_api.login("admin", "password123")
         assert_utils.assert_status_code(res, 200)
+        assert_utils.assert_response_time(res, label="POST /auth")
 
         res_json = res.json()
         assert_utils.assert_field_exists(res_json, "token")

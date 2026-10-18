@@ -36,6 +36,7 @@ class TestBookingUpdate:
 
         res = booking_api.update_booking(booking_id, update_data)
         assert_utils.assert_status_code(res, 200)
+        assert_utils.assert_response_time(res, label=f"PUT /booking/{booking_id}")
 
         # 验证修改后的数据
         res_json = res.json()
@@ -65,6 +66,7 @@ class TestBookingUpdate:
 
         res = booking_api.patch_booking(booking_id, patch_data)
         assert_utils.assert_status_code(res, 200)
+        assert_utils.assert_response_time(res, label=f"PATCH /booking/{booking_id}")
 
         # 验证修改的字段更新了
         res_json = res.json()

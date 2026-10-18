@@ -3,6 +3,8 @@
 # 作用：封装常用断言，统一报错信息，减少用例层重复代码
 # ============================================================
 
+from config.settings import RESPONSE_TIME_LIMIT
+
 
 class AssertUtils:
     """断言工具类"""
@@ -16,6 +18,33 @@ class AssertUtils:
         actual = response.status_code
         assert actual == expected_code, \
             f"状态码不符：预期 {expected_code}，实际 {actual}"
+
+    def assert_response_time(self, response, max_seconds=None, label=""):
+        """
+        响应时间门禁：单次请求耗时必须小于阈值
+
+        作用：接口测试通常只校验"对不对"，这里补上"快不快"，
+        让功能用例也能拦住明显的性能劣化（如某次改动让接口从 5ms 涨到 800ms）。
+
+        :param response: requests Response 对象
+        :param max_seconds: 自定义阈值（秒）；不传则用配置里的 RESPONSE_TIME_LIMIT
+        :param label: 失败时用于定位的接口说明，如 "GET /booking"
+        """
+        limit = max_seconds if max_seconds is not None else RESPONSE_TIME_LIMIT
+        elapsed = response.elapsed.total_seconds()
+
+        if label:
+            target = label
+        else:
+            try:
+                target = f"{response.request.method} {response.url}"
+            except Exception:
+                target = response.url
+
+        assert elapsed < limit, (
+            f"响应时间超限：{target} 耗时 {elapsed * 1000:.0f}ms，"
+            f"超过阈值 {limit * 1000:.1f}ms"
+        )
 
     def assert_field_exists(self, data, field_name):
         """

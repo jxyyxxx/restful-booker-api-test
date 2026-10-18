@@ -26,6 +26,7 @@ class TestBookingQuery:
         """查询预订列表，验证返回的是列表且有数据"""
         res = booking_api.get_booking_list()
         assert_utils.assert_status_code(res, 200)
+        assert_utils.assert_response_time(res, label="GET /booking")
 
         res_json = res.json()
         assert_utils.assert_is_list(res_json)
@@ -48,6 +49,7 @@ class TestBookingQuery:
 
         res = booking_api.get_booking_detail(booking_id)
         assert_utils.assert_status_code(res, expected_code)
+        assert_utils.assert_response_time(res, label=f"GET /booking/{booking_id}")
 
         # 成功时验证返回的预订详情有核心字段
         if expected_code == 200:
