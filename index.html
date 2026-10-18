@@ -15,6 +15,17 @@
         </span>
     </div>
     <div id="popup"></div>
+        <!-- allure-default-language -->
+<script>
+  try {
+    var k = 'ALLURE_REPORT_SETTINGS';
+    var s = JSON.parse(localStorage.getItem(k) || '{}');
+    s.language = 'zh';
+    localStorage.setItem(k, JSON.stringify(s));
+  } catch (e) {
+    /* 浏览器隐私模式禁用 localStorage 时忽略，报告仍可正常打开 */
+  }
+</script>
     <script src="app.js"></script>
     <script src="plugin/behaviors/index.js"></script>
     <script src="plugin/packages/index.js"></script>
@@ -26,7 +37,7 @@
         gtag('js', new Date());
         gtag('config', 'G-FVWC4GKEYS', {
           'allureVersion': '2.30.0',
-          'reportUuid': '767b6c5c-1873-42a8-93af-0cec9e7d35fc',
+          'reportUuid': 'd8b99ec4-e9cd-4ff8-8f40-6c7efce12d7a',
           'single_file': false
         });
     </script>
