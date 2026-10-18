@@ -15,6 +15,7 @@ login_data, login_ids = data_loader.get_test_data("auth/login_data.yaml")
 
 @allure.feature("登录认证")
 @allure.story("登录接口")
+@pytest.mark.auth
 class TestAuth:
     """登录接口测试"""
 
@@ -56,6 +57,7 @@ class TestAuth:
 
     @allure.title("验证登录成功返回的token格式")
     @allure.description("正向登录，验证返回的 token 长度和格式正确")
+    @pytest.mark.smoke
     def test_login_success_token_format(self):
         """正向登录，验证返回的 token 格式正确"""
         res = auth_api.login("admin", "password123")

@@ -23,7 +23,7 @@ restful-booker_测试框架/
 ├── .github/workflows/
 │   └── ci.yml                  # CI 流水线：拉起被测服务 → 跑用例 → 发布 Allure 报告
 ├── config/                     # 1️⃣ 配置层
-│   └── settings.py             # 环境配置（local/online）、超时、日志配置
+│   └── settings.py             # 环境配置（仅 local，支持环境变量覆盖）、超时、日志配置
 ├── common/                     # 2️⃣ 工具层
 │   ├── http_client.py          # HTTP 请求统一封装（Session 自动管理 Cookie）
 │   ├── utils.py                # 通用工具（随机数据生成等）
@@ -66,9 +66,11 @@ restful-booker_测试框架/
 | 项目 | 信息 |
 |------|------|
 | 本地服务地址 | `http://localhost:3001` |
-| 在线环境 | `https://restful-booker.herokuapp.com`（`config/settings.py` 里切换 `ENV`） |
 | 管理员账号 | `admin` / `password123` |
 | 认证方式 | Cookie（`token=xxx`），由 `requests.Session` 自动管理 |
+| 环境切换 | 环境变量 `ENV` 决定（当前白名单只有 `local`，写错会直接 `ValueError`）；`BASE_URL` / `ADMIN_USER` / `ADMIN_PWD` 可覆盖默认值，改环境不用改代码 |
+
+> 本项目只跑本地服务（`npm start` 或 `docker compose up`），不再维护在线环境。
 
 ## 核心接口
 
@@ -104,6 +106,8 @@ npm start
 pip install -r requirements.txt
 ```
 
+> 版本范围写在 `requirements.txt` 里：下界是代码实际用到的最低版本，上界是下一个大版本——既避免上游破坏性变更把 CI 打红，又不限制补丁级升级。升级大版本时同步改上界，并本地跑一遍全量验证。
+
 ### 3. 安装 Allure 命令行工具（生成 HTML 报告需要，需 Java 环境）
 
 ```cmd
@@ -115,11 +119,23 @@ allure --version
 
 ```cmd
 python run.py                 # 入口文件，等价于 pytest
-pytest                        # 全量
-pytest testcases/test_auth.py # 只跑登录模块
-pytest testcases/booking/     # 只跑预订模块
-pytest -m smoke               # 只跑标记了 smoke 的用例
+pytest                        # 全量，39 条
+pytest -m smoke               # 冒烟集，5 条（主链路，0.4 秒）
+pytest -m booking             # 预订模块，24 条
+pytest -m auth                # 登录模块，15 条
+pytest testcases/booking/     # 按目录跑
 pytest -q                     # 安静模式
+```
+
+**临时改被测地址**（比如指向另一台机器上的实例，不用改代码）：
+
+```powershell
+# PowerShell
+$env:BASE_URL = 'http://192.168.1.20:3001'; pytest -q
+# cmd
+set BASE_URL=http://192.168.1.20:3001 && pytest -q
+# bash
+BASE_URL=http://192.168.1.20:3001 pytest -q
 ```
 
 ### 5. 查看报告与日志
@@ -172,16 +188,38 @@ Allure 标题用 `allure.dynamic.title(f"...-{case_name}")` 在用例内部设�
 
 ## 用例清单与规模（共 39 条）
 
-| 模块 | 文件 | 条数 | 覆盖内容 |
-|------|------|------|----------|
-| 登录 | `test_auth.py` | 15 | 正向登录、密码错误（含空/简单密码）、用户名空/空格/不存在、用户名密码均错、特殊字符、超长输入；token 格式校验 |
-| 查询 | `test_booking_query.py` | 9 | 列表非空且每条含 `bookingid`；详情覆盖 ID=1、不存在 ID、0、负数、超大值 |
-| 创建 | `test_booking_create.py` | 11 | 完整数据、缺可选字段、英文姓名、价格 0/超大值、firstname 空、特殊字符；逐个缺必填字段（期望 500） |
-| 修改 | `test_booking_update.py` | 2 | PUT 全量修改；PATCH 只改部分字段并验证未改字段不变 |
-| 删除 | `test_booking_delete.py` | 1 | 删除返回 201，删除后查询返回 404 |
-| 权限 | `test_booking_auth.py` | 1 | 未认证修改返回 403，并清理造出的数据 |
+| 模块 | 文件 | 条数 | 标记 | 覆盖内容 |
+|------|------|------|------|----------|
+| 登录 | `test_auth.py` | 15 | `auth` + `smoke`×1 | 正向登录、密码错误（含空/简单密码）、用户名空/空格/不存在、用户名密码均错、特殊字符、超长输入；token 格式校验 |
+| 查询 | `test_booking_query.py` | 9 | `booking` + `smoke`×1 | 列表非空且每条含 `bookingid`；详情覆盖 ID=1、不存在 ID、0、负数、超大值 |
+| 创建 | `test_booking_create.py` | 11 | `booking` | 完整数据、缺可选字段、英文姓名、价格 0/超大值、firstname 空、特殊字符；逐个缺必填字段（期望 500） |
+| 修改 | `test_booking_update.py` | 2 | `booking` + `smoke`×2 | PUT 全量修改；PATCH 只改部分字段并验证未改字段不变 |
+| 删除 | `test_booking_delete.py` | 1 | `booking` + `smoke`×1 | 删除返回 201，删除后查询返回 404 |
+| 权限 | `test_booking_auth.py` | 1 | `booking` | 未认证修改返回 403，并清理造出的数据 |
 
 > 设计原则：每条数据对应一个独立场景（等价类 / 边界值 / 异常输入），不用重复数据凑条数。
+
+---
+
+## 用例分层与标记
+
+`pytest.ini` 注册了四个标记，并且都已实际打在用例上（不是"声明了但没人用"）：
+
+| 标记 | 打在哪 | 命中条数 | 命令 |
+|------|--------|----------|------|
+| `smoke` | 主链路 5 条用例 | 5 | `pytest -m smoke` |
+| `booking` | 5 个预订模块测试类（类级） | 24 | `pytest -m booking` |
+| `auth` | 登录模块测试类（类级） | 15 | `pytest -m auth` |
+| `regression` | 预留，暂未使用 | 0 | — |
+
+**冒烟集 = 正向登录（token 格式）+ 查询列表 + PUT 全量修改 + PATCH 部分修改 + 删除**，跑一遍等于走完「登录 → 创建 → 查询 → 修改 → 删除」主链路（创建由 `test_booking` fixture 间接触发），耗时约 0.4 秒。
+
+两个容易踩的点：
+
+1. **冒烟标记只打在非参数化函数上**。参数化用例（登录 14 条、创建 11 条、查询详情 8 条）不能整体打 `smoke`，否则 14 条登录数据会全部变成冒烟，粒度就废了。想精确到某一条参数，得在数据和标记之间打通（如 `pytest.param(..., marks=...)`），成本不划算，所以用"圈定非参数化主链路"的方式。
+2. **`--strict-markers` 只管装饰器，不管命令行**。写 `@pytest.mark.smooke` 会直接报错；但 `pytest -m smooke` 不会被拦住，结果是 `39 deselected` + 退出码 5（"没收集到用例"）——CI 照样会红，只是提示不如前者清楚。
+
+当前 CI 仍然跑全量：39 条只要 0.7 秒，分层省不出时间。标记是为了以后用例变多、需要"push 跑冒烟、定时跑全量"时准备好的。
 
 ---
 
@@ -212,25 +250,3 @@ Allure 标题用 `allure.dynamic.title(f"...-{case_name}")` 在用例内部设�
 | `concurrency` 取消过期运行 | 同一分支连续提交时，旧流水线占资源且报告互相覆盖 |
 
 **本地与 CI 的行为差异**：`conftest.py` 的 `pytest_sessionfinish` 检测到环境变量 `CI` 时直接返回，不做 `allure generate`、也不 `allure open`——CI 里报告由 workflow 显式生成一次，且没有浏览器可开。所以在其他 CI（Jenkins 等）上运行本框架时，记得设置 `CI=true`，否则会重复生成报告甚至挂住输出管道。
-
----
-
-## 常见问题
-
-**Q：报告里用例标题显示成 `登录测试-{case_name}`？**
-参数化传进来的是 dict，`@allure.title` 占位符取不到内部字段。用 `allure.dynamic.title(...)` 在用例内设置（本框架已按此实现）。
-
-**Q：跑完发现系统里多了很多预订？**
-说明有创建类用例没清理。检查是否漏了 `finally` 清理、或清理时未登录（删除需要 token）。
-
-**Q：CI 上服务启动失败？**
-看 artifact 里的 `service.log`。最常见两个原因：`uuid` 版本不兼容（需 `uuid@9.0.1`）、启动等待时间不足。
-
----
-
-## 后续计划
-
-- [ ] 增加 `/ping` 健康检查用例
-- [ ] 引入 pytest-xdist 并行执行
-- [ ] 增加接口 schema 校验（jsonschema）
-- [ ] 失败用例自动重试并标记 flaky

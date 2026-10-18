@@ -15,6 +15,7 @@ booking_create_data, booking_create_ids = data_loader.get_test_data("booking/cre
 
 @allure.feature("预订管理")
 @allure.story("创建预订")
+@pytest.mark.booking
 class TestBookingCreate:
     """创建预订接口测试"""
 

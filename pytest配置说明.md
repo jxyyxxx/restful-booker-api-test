@@ -29,24 +29,40 @@ pytest 运行时自动读取这个文件，控制测试的运行规则。本文�
 ### `markers`
 自定义测试标记，用来给用例分类，运行时可以用 `-m` 筛选。
 ```bash
-pytest -m smoke    # 只跑标记了 smoke 的用例
-pytest -m booking  # 只跑标记了 booking 的用例
+pytest -m smoke    # 只跑主链路冒烟集（5 条）
+pytest -m booking  # 只跑预订模块（24 条）
+pytest -m auth     # 只跑登录模块（15 条）
+pytest -m "not smoke"   # 反向筛选：跳过冒烟集
 ```
-当前定义的标记：
-- `smoke`：冒烟测试，核心主流程
-- `regression`：回归测试，全量覆盖
-- `auth`：登录模块
-- `booking`：预订模块
+当前定义的标记（都已实际打在用例上）：
+
+| 标记 | 打在哪 | 命中条数 | 说明 |
+|------|--------|----------|------|
+| `smoke` | 5 个非参数化主链路用例（函数级） | 5 | 正向登录、查询列表、PUT 修改、PATCH 修改、删除；创建由 fixture 间接触发 |
+| `booking` | 5 个预订模块测试类（类级） | 24 | 查询 / 创建 / 修改 / 删除 / 未认证 |
+| `auth` | `TestAuth` 测试类（类级） | 15 | 登录模块全部用例 |
+| `regression` | 预留，暂未使用 | 0 | 需要"全量回归"语义时再用 |
+
+> 为什么冒烟只打在非参数化用例上：参数化用例一个函数会展开成多条（如登录 14 条），
+> 在函数上打 `smoke` 会让这 14 条全部进入冒烟集，粒度就失去了。
+> 想精确到单条参数，需要在 YAML 里声明 marks 并让 DataLoader 透传（`pytest.param(..., marks=...)`），成本不划算。
 
 ---
 
-### `addopts = -v --alluredir=reports/allure-results --clean-alluredir`
+### `addopts = -v --alluredir=reports/allure-results --clean-alluredir --strict-markers`
 默认命令行参数，每次运行 `pytest` 自动带上，不用每次手动敲：
 - `-v`：显示详细输出（每条用例的名字和结果）
 - `--alluredir=reports/allure-results`：生成 Allure 结果文件（JSON 格式）到指定目录
 - `--clean-alluredir`：运行前先清空旧的结果文件，避免历史数据干扰
+- `--strict-markers`：使用未在 `markers` 里注册的标记时直接报错
 
-> 这是 Allure 结果目录的**唯一真源**：本地 `conftest.py` 的钩子、CI 里的 `allure generate` 都读这个目录，
+**`--strict-markers` 的边界**（容易误解）：它只校验代码里 `@pytest.mark.xxx` 的装饰器名。
+写 `@pytest.mark.smooke` 会立刻报错；但命令行 `pytest -m smooke` **不会**被它拦住——
+那会得到 `39 deselected`、退出码 5（pytest 的"没收集到用例"专用码），CI 依然会判红，只是提示没那么直观。
+
+> 注意：这里只生成 Allure 的 JSON 结果文件，HTML 报告由 conftest.py 里的 `pytest_sessionfinish` 钩子在测试结束后自动调用 `allure generate` 生成（CI 环境下该钩子会跳过，由 workflow 生成）。
+>
+> `reports/allure-results` 是 Allure 结果目录的**唯一真源**：本地钩子、CI 里的 `allure generate` 都读这个目录，
 > 命令里不要再额外传 `--alluredir`，否则会出现两份结果、报告内容对不上。
 
 ---

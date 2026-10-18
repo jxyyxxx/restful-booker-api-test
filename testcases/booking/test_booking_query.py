@@ -15,11 +15,13 @@ booking_query_data, booking_query_ids = data_loader.get_test_data("booking/query
 
 @allure.feature("预订管理")
 @allure.story("查询预订")
+@pytest.mark.booking
 class TestBookingQuery:
     """预订查询接口测试"""
 
     @allure.title("查询预订列表")
     @allure.description("验证查询预订列表接口返回正常，列表不为空，每条数据都有bookingid")
+    @pytest.mark.smoke
     def test_booking_list(self):
         """查询预订列表，验证返回的是列表且有数据"""
         res = booking_api.get_booking_list()

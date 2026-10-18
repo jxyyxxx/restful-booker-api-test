@@ -4,6 +4,7 @@
 # ============================================================
 
 import allure
+import pytest
 from common.api.booking_api import booking_api
 from common.assert_utils import assert_utils
 from common.http_client import http
@@ -12,6 +13,7 @@ from common.utils import utils
 
 @allure.feature("预订管理")
 @allure.story("认证权限")
+@pytest.mark.booking
 class TestBookingAuth:
     """预订接口认证权限测试"""
 

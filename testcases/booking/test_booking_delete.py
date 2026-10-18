@@ -4,6 +4,7 @@
 # ============================================================
 
 import allure
+import pytest
 from common.api.booking_api import booking_api
 from common.assert_utils import assert_utils
 from common.utils import utils
@@ -11,11 +12,13 @@ from common.utils import utils
 
 @allure.feature("预订管理")
 @allure.story("删除预订")
+@pytest.mark.booking
 class TestBookingDelete:
     """删除预订接口测试"""
 
     @allure.title("删除预订")
     @allure.description("创建预订后删除，验证删除成功，删除后查询返回404")
+    @pytest.mark.smoke
     def test_delete_booking(self, admin_login):
         """
         删除预订接口测试

@@ -4,17 +4,20 @@
 # ============================================================
 
 import allure
+import pytest
 from common.api.booking_api import booking_api
 from common.assert_utils import assert_utils
 
 
 @allure.feature("预订管理")
 @allure.story("修改预订")
+@pytest.mark.booking
 class TestBookingUpdate:
     """修改预订接口测试"""
 
     @allure.title("全量修改预订（PUT）")
     @allure.description("使用PUT方法全量修改预订，验证修改成功且数据正确")
+    @pytest.mark.smoke
     def test_update_booking(self, admin_login, test_booking):
         """
         修改预订接口测试（PUT 全量修改）
@@ -42,6 +45,7 @@ class TestBookingUpdate:
 
     @allure.title("部分修改预订（PATCH）")
     @allure.description("使用PATCH方法只修改部分字段，验证修改的字段更新，未修改的字段保持不变")
+    @pytest.mark.smoke
     def test_patch_booking(self, admin_login, test_booking):
         """
         部分修改预订接口测试（PATCH）
