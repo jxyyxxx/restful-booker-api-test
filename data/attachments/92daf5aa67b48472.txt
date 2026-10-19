@@ -1,0 +1,4 @@
+[2026-10-19 04:07:49] [INFO] [logger.separator:111] ========== 开始执行用例：test_booking_detail[反向-查询不存在的ID=888888] ==========
+[2026-10-19 04:07:49] [INFO] [http_client.request:45] 发送请求：GET http://localhost:3001/booking/888888
+[2026-10-19 04:07:49] [INFO] [http_client.request:57] 响应状态码：404，耗时：0.01s
+[2026-10-19 04:07:49] [INFO] [conftest.log_test_case:42] 用例执行完成：test_booking_detail[反向-查询不存在的ID=888888]
