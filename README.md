@@ -22,25 +22,26 @@
 restful-booker_测试框架/
 ├── .github/workflows/
 │   └── ci.yml                  # CI 流水线：拉起被测服务 → 跑用例 → 发布 Allure 报告
-├── config/                     # 1️⃣ 配置层
-│   ├── settings.py             # 环境配置（仅 local，支持环境变量覆盖）、超时、日志配置
-│   └── allure_categories.json  # Allure 失败分类规则（跑测试时拷进结果目录）
-├── common/                     # 2️⃣ 工具层
-│   ├── http_client.py          # HTTP 请求统一封装（Session 自动管理 Cookie）
-│   ├── utils.py                # 通用工具（随机数据生成等）
-│   ├── assert_utils.py         # 断言工具类（统一断言，减少重复）
-│   ├── logger.py               # 日志工具类（控制台+文件双输出，单例）
-│   ├── data_loader.py          # YAML 数据加载（自动提取 case_name 作为用例 ID）
-│   ├── allure_report.py        # Allure 报告后处理：默认语言设为中文
-│   └── api/                    # 3️⃣ 接口方法层
-│       ├── auth_api.py         # 登录接口封装
-│       └── booking_api.py      # 预订接口封装
+├── api/                        # 1️⃣ 接口方法层（与业务接口一一对应）
+│   ├── auth_api.py             # 登录接口封装
+│   └── booking_api.py          # 预订接口封装
+├── common/                     # 2️⃣ 工具层（与业务无关的通用能力）
+│   ├── http_client.py          # HTTP 统一封装（Session/超时/日志/步骤/脱敏）
+│   ├── assert_utils.py         # 断言工具（8 个断言，均带 Allure 步骤）
+│   ├── data_factory.py         # 测试数据工厂（随机造数、入住/离店日期）
+│   ├── masking.py              # 日志脱敏（password/token → ***）
+│   ├── data_loader.py          # YAML 数据加载（自动提取 case_name 作用例 ID）
+│   ├── logger.py               # 日志（单例，控制台+文件双输出）
+│   └── reporting.py            # Allure 报告（环境面板/失败分类/生成/默认中文）
+├── config/                     # 3️⃣ 配置层
+│   ├── settings.py             # 环境、地址、账号、超时、时延门限、日志配置
+│   └── allure/
+│       └── categories.json     # 失败分类规则（跑测试时拷进结果目录）
 ├── data/                       # 4️⃣ 数据层（YAML，按模块分目录）
-│   └── yaml/
-│       ├── auth/login_data.yaml          # 登录 14 条
-│       └── booking/
-│           ├── create_data.yaml          # 创建 11 条
-│           └── query_data.yaml           # 查询 7 条（均为不存在的 ID）
+│   ├── auth/login.yaml         # 登录 14 条
+│   └── booking/
+│       ├── create.yaml         # 创建 11 条
+│       └── query.yaml          # 查询 7 条（均为不存在的 ID）
 ├── testcases/                  # 5️⃣ 用例层（按模块分目录）
 │   ├── health/
 │   │   └── test_ping.py        # 健康检查 1 条（/ping，冒烟集第一条）
@@ -171,7 +172,7 @@ BASE_URL=http://192.168.1.20:3001 pytest -q
 ## 框架特性
 
 ### 1. 接口方法层封装
-用例层不直接调 `http.get/post`，而是调 `booking_api.create_booking()` 这类业务方法；接口路径或参数变化时只改 `common/api/` 一个文件。
+用例层不直接调 `http.get/post`，而是调 `booking_api.create_booking()` 这类业务方法；接口路径或参数变化时只改 `api/` 一个文件。
 
 ### 2. YAML 数据驱动 + 动态用例标题
 测试数据按模块、按接口拆成独立 YAML，每条数据自带 `case_name`，作为 pytest 参数化 ID。
@@ -259,20 +260,20 @@ Allure 标题用 `allure.dynamic.title(f"...-{case_name}")` 在用例内部设�
 |------|----------|-----------|
 | 用例步骤 | `http_client.py`、`assert_utils.py` 里的 `allure.step` | 点开一条用例，能看到「POST /auth → 断言：状态码 == 200 → 断言：字段 token 存在」这样的步骤链，失败时直接定位到哪一步 |
 | 左侧「环境」面板 | `reports/allure-results/environment.properties` | 被测地址、环境名、Python / pytest 版本、操作系统，**以及本次执行范围** |
-| 「分类」页 | `config/allure_categories.json`（跑测试时拷进结果目录，生成成 `categories.json`） | 失败自动归为「响应时间门禁超限」「被测服务不可用 / 连接异常」「断言失败（功能不符合预期）」；三条规则互斥（"断言失败"用负向断言排除了时延超限），不会一条失败同时进两个分类 |
+| 「分类」页 | `config/allure/categories.json`（跑测试时拷进结果目录，生成成 `categories.json`） | 失败自动归为「响应时间门禁超限」「被测服务不可用 / 连接异常」「断言失败（功能不符合预期）」；三条规则互斥（"断言失败"用负向断言排除了时延超限），不会一条失败同时进两个分类 |
 | 「严重级别」视图 | 用例类上的 `@allure.severity` | 核心链路标 `CRITICAL`（`/ping` 探活、登录、创建），其余标 `NORMAL` |
 | 概览 / 套件 | 用例的 feature / story / 动态标题 | 按「健康检查 / 登录认证 / 预订管理」分组，用例名带 `case_name` |
 
 ### 报告的默认语言
 
 Allure 报告默认是英文，语言选择存在浏览器 `localStorage` 里，换个端口打开就要重新切一次。
-本框架在生成报告后调用 `common/allure_report.py` 往 `index.html` 注入一小段脚本，
+本框架在生成报告后调用 `common/reporting.py` 往 `index.html` 注入一小段脚本，
 **打开即中文，无需手动切换**：
 
 ```bash
-python -m common.allure_report reports/allure-html   # 本地手动执行（conftest 已自动调用）
-python -m common.allure_report allure-report         # CI 里由 workflow 的同名步骤执行
-python -m common.allure_report <dir> --lang en       # 需要时切回英文
+python -m common.reporting reports/allure-html   # 本地手动执行（conftest 已自动调用）
+python -m common.reporting allure-report         # CI 里由 workflow 的同名步骤执行
+python -m common.reporting <dir> --lang en       # 需要时切回英文
 ```
 
 脚本是幂等的（重复执行不会重复注入），浏览器禁用 `localStorage` 时静默跳过、不影响报告打开。
@@ -327,7 +328,7 @@ PR 只跑冒烟是为了给提交快速反馈；`main` 的 push 与定时任务�
 3. 克隆 restful-booker 并 `checkout` 到 **固定 commit**（`SERVICE_COMMIT`），再启动服务；打印被测服务 commit，60 秒内未响应则输出 `::error::` 并打印服务日志后失败
 4. 按事件/输入选择测试范围：PR 与手动 smoke 跑 `pytest -m smoke -q`，其余跑 `pytest -q`（Allure 结果目录由 `pytest.ini` 的 `addopts` 决定，CI 不重复传参）
 5. `allure generate` 生成 HTML 报告
-6. `python -m common.allure_report allure-report` 把报告默认语言设为中文
+6. `python -m common.reporting allure-report` 把报告默认语言设为中文
 7. 上传 artifact：`reports/allure-results`、`allure-report`、`logs`、`service.log`（文件名带 Python 版本与 run_attempt，多次运行不覆盖）
 8. 发布到 GitHub Pages（`gh-pages` 分支）
 

@@ -5,12 +5,12 @@
 
 import allure
 import pytest
-from common.api.auth_api import auth_api
+from api.auth_api import auth_api
 from common.assert_utils import assert_utils
 from common.data_loader import data_loader
 
 # 从 YAML 文件读取登录测试数据，自动提取 case_name 作为用例名
-login_data, login_ids = data_loader.get_test_data("auth/login_data.yaml")
+login_data, login_ids = data_loader.get_test_data("auth/login.yaml")
 
 
 @allure.feature("登录认证")

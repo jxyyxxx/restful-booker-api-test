@@ -14,13 +14,13 @@ class DataLoader:
     def __init__(self, yaml_dir=None):
         """
         初始化
-        :param yaml_dir: YAML 文件目录，不传则用默认的 data/yaml
+        :param yaml_dir: YAML 文件目录，不传则用默认的 data
         """
         if yaml_dir is None:
-            # 默认路径：项目根目录下的 data/yaml
+            # 默认路径：项目根目录下的 data（按模块分目录）
             self.yaml_dir = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                "data", "yaml"
+                "data"
             )
         else:
             self.yaml_dir = yaml_dir
@@ -28,7 +28,7 @@ class DataLoader:
     def load(self, filename, key=None):
         """
         读取 YAML 文件
-        :param filename: 文件名，比如 "login_data.yaml"
+        :param filename: 文件名，比如 "login.yaml"
         :param key: 要读取的子节点 key，比如 booking_data.yaml 里的 "create"、"query"
         :return: 数据列表
         """

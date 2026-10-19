@@ -5,12 +5,12 @@
 
 import allure
 import pytest
-from common.api.booking_api import booking_api
+from api.booking_api import booking_api
 from common.assert_utils import assert_utils
 from common.data_loader import data_loader
 
 # 从 YAML 文件读取创建预订测试数据
-booking_create_data, booking_create_ids = data_loader.get_test_data("booking/create_data.yaml")
+booking_create_data, booking_create_ids = data_loader.get_test_data("booking/create.yaml")
 
 
 @allure.feature("预订管理")

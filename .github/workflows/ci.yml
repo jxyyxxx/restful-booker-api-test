@@ -145,7 +145,7 @@ jobs:
         if: always()
         run: |
           if [ -f allure-report/index.html ]; then
-            python -m common.allure_report allure-report
+            python -m common.reporting allure-report
           else
             echo "::warning::报告未生成，跳过默认语言设置"
           fi

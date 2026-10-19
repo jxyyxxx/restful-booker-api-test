@@ -5,11 +5,11 @@
 
 import allure
 import pytest
-from common.api.booking_api import booking_api
+from api.booking_api import booking_api
 from common.assert_utils import assert_utils
+from common.data_factory import data_factory
 from common.http_client import http
 from common.logger import logger
-from common.utils import utils
 
 
 @allure.feature("预订管理")
@@ -30,7 +30,7 @@ class TestBookingPermission:
         finally 里既恢复不了登录态、也删不掉自己创建的数据，每跑一轮就泄漏一条预订。
         """
         # 先创建一条预订（创建接口不需要认证）
-        create_data = utils.random_booking_data()
+        create_data = data_factory.random_booking_data()
         create_res = booking_api.create_booking(create_data)
         booking_id = create_res.json()["bookingid"]
 

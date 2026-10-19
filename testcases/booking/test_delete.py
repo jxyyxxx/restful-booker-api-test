@@ -5,9 +5,9 @@
 
 import allure
 import pytest
-from common.api.booking_api import booking_api
+from api.booking_api import booking_api
 from common.assert_utils import assert_utils
-from common.utils import utils
+from common.data_factory import data_factory
 
 
 @allure.feature("预订管理")
@@ -27,7 +27,7 @@ class TestBookingDelete:
         注意：不使用 test_booking fixture（因为 fixture 后置也会删，会重复）
         """
         # 1. 先创建一条预订
-        create_data = utils.random_booking_data()
+        create_data = data_factory.random_booking_data()
         create_res = booking_api.create_booking(create_data)
         booking_id = create_res.json()["bookingid"]
 

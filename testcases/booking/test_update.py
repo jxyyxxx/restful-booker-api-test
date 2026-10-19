@@ -5,7 +5,7 @@
 
 import allure
 import pytest
-from common.api.booking_api import booking_api
+from api.booking_api import booking_api
 from common.assert_utils import assert_utils
 
 

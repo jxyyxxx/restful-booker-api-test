@@ -7,12 +7,12 @@
 
 import allure
 import pytest
-from common.api.booking_api import booking_api
+from api.booking_api import booking_api
 from common.assert_utils import assert_utils
 from common.data_loader import data_loader
 
 # 从 YAML 文件读取查询预订测试数据（全部是"不存在/非法 ID"的反向数据）
-booking_query_data, booking_query_ids = data_loader.get_test_data("booking/query_data.yaml")
+booking_query_data, booking_query_ids = data_loader.get_test_data("booking/query.yaml")
 
 
 @allure.feature("预订管理")

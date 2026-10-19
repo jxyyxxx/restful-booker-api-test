@@ -9,7 +9,7 @@ import allure
 import requests
 from config.settings import BASE_URL, REQUEST_TIMEOUT
 from common.logger import logger
-from common.utils import utils
+from common.masking import mask
 
 
 class HttpClient:
@@ -45,7 +45,7 @@ class HttpClient:
                 logger.info(f"发送请求：{method} {url}")
                 if "json" in kwargs:
                     # 脱敏后再落日志：/auth 的请求体里有明文密码，不能原样写进日志文件
-                    logger.debug(f"请求体：{utils.mask_mapping(kwargs['json'])}")
+                    logger.debug(f"请求体：{mask(kwargs['json'])}")
 
                 # 发送请求
                 res = self.session.request(method, url, **kwargs)
@@ -55,7 +55,7 @@ class HttpClient:
 
                 # 记录响应日志
                 logger.info(f"响应状态码：{res.status_code}，耗时：{elapsed}s")
-                logger.debug(f"响应体：{utils.mask_text(res.text[:500])}")
+                logger.debug(f"响应体：{mask(res.text[:500])}")
 
                 return res
             except requests.exceptions.Timeout:
