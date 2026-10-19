@@ -24,7 +24,8 @@ from config.settings import BASE_URL, ADMIN_USER, ADMIN_PWD, ENV, RESPONSE_TIME_
 #    集体报连接错误；全量与冒烟集都生效
 # ------------------------------------------------------------
 def pytest_collection_modifyitems(session, config, items):
-    health = [item for item in items if "test_health" in item.nodeid]
+    # 按模块路径匹配（testcases/health/），不要再按文件名匹配——改名时一并同步
+    health = [item for item in items if "/health/" in item.nodeid]
     if health:
         rest = [item for item in items if item not in health]
         items[:] = health + rest

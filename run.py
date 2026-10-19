@@ -24,7 +24,7 @@ if __name__ == "__main__":
     ])
 
     # 方式2：只执行登录模块
-    # pytest.main(["-v", "testcases/test_auth.py"])
+    # pytest.main(["-v", "testcases/auth/test_login.py"])
 
     # 方式3：只执行预订模块
     # pytest.main(["-v", "testcases/booking/"])

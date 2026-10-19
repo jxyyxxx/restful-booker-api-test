@@ -17,7 +17,7 @@ login_data, login_ids = data_loader.get_test_data("auth/login_data.yaml")
 @allure.story("登录接口")
 @allure.severity(allure.severity_level.CRITICAL)
 @pytest.mark.auth
-class TestAuth:
+class TestLogin:
     """登录接口测试"""
 
     @allure.title("登录测试")

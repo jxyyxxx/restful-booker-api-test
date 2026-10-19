@@ -1,5 +1,5 @@
 # ============================================================
-# 用例层：预订接口认证测试
+# 用例层：预订接口权限测试（未认证 403）
 # 覆盖：未认证时修改预订应该返回 403
 # ============================================================
 
@@ -16,7 +16,7 @@ from common.utils import utils
 @allure.story("认证权限")
 @allure.severity(allure.severity_level.NORMAL)
 @pytest.mark.booking
-class TestBookingAuth:
+class TestBookingPermission:
     """预订接口认证权限测试"""
 
     @allure.title("未登录时修改预订返回403")

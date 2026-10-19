@@ -41,15 +41,19 @@ restful-booker_测试框架/
 │       └── booking/
 │           ├── create_data.yaml          # 创建 11 条
 │           └── query_data.yaml           # 查询 7 条（均为不存在的 ID）
-├── testcases/                  # 5️⃣ 用例层（按功能细分）
-│   ├── test_health.py          # 健康检查 1 条（/ping，冒烟集第一条）
-│   ├── test_auth.py            # 登录 15 条（14 参数化 + 1 条 token 格式）
+├── testcases/                  # 5️⃣ 用例层（按模块分目录）
+│   ├── health/
+│   │   └── test_ping.py        # 健康检查 1 条（/ping，冒烟集第一条）
+│   ├── auth/
+│   │   └── test_login.py       # 登录 15 条（14 参数化 + 1 条 token 格式）
 │   └── booking/
-│       ├── test_booking_query.py    # 查询 9 条（列表 1 + 自建详情 1 + 不存在 ID 7）
-│       ├── test_booking_create.py   # 创建 11 条
-│       ├── test_booking_update.py   # 修改 2 条（PUT + PATCH）
-│       ├── test_booking_delete.py   # 删除 1 条
-│       └── test_booking_auth.py     # 未认证 403 1 条
+│       ├── test_query.py       # 查询 9 条（列表 1 + 自建详情 1 + 不存在 ID 7）
+│       ├── test_create.py      # 创建 11 条
+│       ├── test_update.py      # 修改 2 条（PUT + PATCH）
+│       ├── test_delete.py      # 删除 1 条
+│       └── test_permission.py  # 未认证 403 1 条
+├── docs/
+│   └── pytest-config.md        # pytest.ini 逐项说明
 ├── logs/                       # 6️⃣ 日志文件（按 {环境}_{时间}.log 命名，已 gitignore）
 ├── reports/                    # 7️⃣ 报告目录（已 gitignore，CI 产物走 artifact）
 │   ├── allure-results/         # Allure 结果文件（JSON）
@@ -57,7 +61,6 @@ restful-booker_测试框架/
 ├── conftest.py                 # 8️⃣ 夹具层（全局 fixture + 会话结束钩子）
 ├── pytest.ini                  # pytest 核心配置
 ├── run.py                      # 9️⃣ 执行入口（封装配置好的 pytest 命令）
-├── pytest配置说明.md            # pytest.ini 逐项说明
 ├── requirements.txt            # 开发期依赖范围（下界/上界）
 ├── requirements.lock           # 依赖锁：CI 用的精确版本
 └── README.md
@@ -211,13 +214,13 @@ Allure 标题用 `allure.dynamic.title(f"...-{case_name}")` 在用例内部设�
 
 | 模块 | 文件 | 条数 | 标记 | 覆盖内容 |
 |------|------|------|------|----------|
-| 健康检查 | `test_health.py` | 1 | `smoke` | `/ping` 返回 201（非 200），确认服务在线，同时校验响应时间门禁 |
-| 登录 | `test_auth.py` | 15 | `auth` + `smoke`×1 | 正向登录、密码错误（含空/简单密码）、用户名空/空格/不存在、用户名密码均错、特殊字符、超长输入；token 格式校验 |
-| 查询 | `test_booking_query.py` | 9 | `booking` + `smoke`×1 | 列表：自建数据后查列表，非空且每条含 `bookingid`；详情：自建数据查自己（200）+ 7 条不存在/非法 ID（404：0、负数、超大值） |
-| 创建 | `test_booking_create.py` | 11 | `booking` | 完整数据、缺可选字段、英文姓名、价格 0/超大值、firstname 空、特殊字符；逐个缺必填字段（期望 500） |
-| 修改 | `test_booking_update.py` | 2 | `booking` + `smoke`×2 | PUT 全量修改；PATCH 只改部分字段并验证未改字段不变 |
-| 删除 | `test_booking_delete.py` | 1 | `booking` + `smoke`×1 | 删除返回 201，删除后查询返回 404 |
-| 权限 | `test_booking_auth.py` | 1 | `booking` | 未认证修改返回 403，并清理造出的数据 |
+| 健康检查 | `health/test_ping.py` | 1 | `smoke` | `/ping` 返回 201（非 200），确认服务在线，同时校验响应时间门禁 |
+| 登录 | `auth/test_login.py` | 15 | `auth` + `smoke`×1 | 正向登录、密码错误（含空/简单密码）、用户名空/空格/不存在、用户名密码均错、特殊字符、超长输入；token 格式校验 |
+| 查询 | `booking/test_query.py` | 9 | `booking` + `smoke`×1 | 列表：自建数据后查列表，非空且每条含 `bookingid`；详情：自建数据查自己（200）+ 7 条不存在/非法 ID（404：0、负数、超大值） |
+| 创建 | `booking/test_create.py` | 11 | `booking` | 完整数据、缺可选字段、英文姓名、价格 0/超大值、firstname 空、特殊字符；逐个缺必填字段（期望 500） |
+| 修改 | `booking/test_update.py` | 2 | `booking` + `smoke`×2 | PUT 全量修改；PATCH 只改部分字段并验证未改字段不变 |
+| 删除 | `booking/test_delete.py` | 1 | `booking` + `smoke`×1 | 删除返回 201，删除后查询返回 404 |
+| 权限 | `booking/test_permission.py` | 1 | `booking` | 未认证修改返回 403，并清理造出的数据 |
 
 > 设计原则：每条数据对应一个独立场景（等价类 / 边界值 / 异常输入），不用重复数据凑条数。
 

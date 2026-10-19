@@ -25,7 +25,7 @@ class TestBookingCreate:
     @pytest.mark.parametrize("case", booking_create_data, ids=booking_create_ids)
     def test_create_booking(self, admin_login, case):
         """创建预订接口测试，覆盖正向和反向用例"""
-        # 动态设置 Allure 报告标题：原因同 test_auth.py，占位符取不到 dict 内部字段
+        # 动态设置 Allure 报告标题：原因同 testcases/auth/test_login.py，占位符取不到 dict 内部字段
         allure.dynamic.title(f"创建预订-{case['case_name']}")
 
         res = booking_api.create_booking(case["data"])

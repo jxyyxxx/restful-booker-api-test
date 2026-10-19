@@ -1,6 +1,6 @@
 # ============================================================
 # 查询预订接口测试数据（共 7 条，全部是反向场景）
-# 对应测试用例：testcases/booking/test_booking_query.py
+# 对应测试用例：testcases/booking/test_query.py
 # 字段说明：
 #   case_name: 用例名称（会自动作为测试报告里的用例名）
 #   booking_id: 预订ID
