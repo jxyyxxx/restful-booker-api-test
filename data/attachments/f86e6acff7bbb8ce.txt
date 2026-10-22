@@ -1,4 +1,0 @@
-[2026-10-21 04:09:36] [INFO] [logger.separator:111] ========== 开始执行用例：test_login[正向-登录成功] ==========
-[2026-10-21 04:09:36] [INFO] [http_client.request:45] 发送请求：POST http://localhost:3001/auth
-[2026-10-21 04:09:36] [INFO] [http_client.request:57] 响应状态码：200，耗时：0.01s
-[2026-10-21 04:09:36] [INFO] [conftest.log_test_case:45] 用例执行完成：test_login[正向-登录成功]
