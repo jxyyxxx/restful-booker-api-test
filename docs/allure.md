@@ -9,14 +9,14 @@
 | 用例步骤 | `common/http_client.py`、`common/assert_utils.py` 里的 `allure.step` | 点开一条用例，能看到「POST /auth → 断言：状态码 == 200 → 断言：字段 token 存在」这样的步骤链，失败时直接定位到哪一步 |
 | 左侧「环境」面板 | `reports/allure-results/environment.properties` | 被测地址、环境名、Python / pytest 版本、操作系统、框架自身 commit，**以及本次执行范围** |
 | 「趋势」图、「持续时长」图 | `reports/allure-history/{scope}/`（生成前拷进结果目录） | 每次运行的通过/失败数量、耗时曲线；按执行范围分开累积（全量一条线、冒烟一条线），点开单条用例还能看到「历史」标签页 |
-| 顶部「运行器」 | `reports/allure-results/executor.json` | `本地 第3次 · 全量40条 · a1b2c3d` 或 `CI #123 · 全量40条`；CI 上可点进对应的 Actions run |
+| 顶部「运行器」 | `reports/allure-results/executor.json` | `本地 第3次 · 全量40条 · 10-25 11:07:49` 或 `CI #123 · 全量40条`；CI 上可点进对应的 Actions run |
 | 「分类」页 | `config/allure/categories.json`（跑测试时拷进结果目录，生成成 `categories.json`） | 失败自动归为「响应时间门禁超限」「被测服务不可用 / 连接异常」「断言失败（功能不符合预期）」；三条规则互斥（"断言失败"用负向断言排除了时延超限），不会一条失败同时进两个分类 |
 | 「严重级别」视图 | 用例类上的 `@allure.severity` | 核心链路标 `CRITICAL`（`/ping` 探活、登录、创建），其余标 `NORMAL` |
 | 概览 / 套件 | 用例的 feature / story / 动态标题 | 按「健康检查 / 登录认证 / 预订管理」分组，用例名带 `case_name` |
 
 ## 趋势与运行器
 
-报告顶部那行 `本地 第3次 · 全量40条 · a1b2c3d` 和「趋势」图，靠两个输入文件：
+报告顶部那行 `本地 第3次 · 全量40条 · 10-25 11:07:49` 和「趋势」图，靠两个输入文件：
 
 | 文件 | 谁写 | 作用 |
 |------|------|------|
@@ -37,6 +37,34 @@ CI 侧：workflow 在跑测试前从 `gh-pages` 恢复上一份报告的 `histor
 rm -rf reports/allure-history/full    # 只重置全量那条线
 rm -rf reports/allure-history         # 全部重置
 ```
+
+## 报告归档
+
+`reports/allure-html` 每次 `generate --clean` 都会被覆盖，所以每次运行结束会**自动复制一份**到 `reports/archive/{scope}/`，用于事后回看某一次的现场（步骤、响应体、趋势图）。
+
+```
+reports/archive/full/
+├── 003_2026-10-25_10-58-38_FAIL/
+└── 005_2026-10-25_11-06-40_PASS/
+```
+
+目录名是 `序号_日期_时间_状态`：
+
+- **序号**零填充，字典序就是运行顺序，清理时直接切片；
+- **状态**由报告自己的 `widgets/summary.json` 判定（`failed + broken > 0` 即 `FAIL`），和报告上的数字一定一致；
+- 时间取**会话开始时间**，不是生成报告的时刻（跑得久的那次两者能差好几分钟）。
+
+保留策略（`common/reporting.py` 顶部常量）：
+
+| 类型 | 常量 | 默认 |
+|------|------|------|
+| 通过的运行 | `ARCHIVE_KEEP_PASS` | 20 份 |
+| 有失败的运行 | `ARCHIVE_KEEP_FAIL` | 30 份 |
+
+按执行范围分开存（`full/`、`smoke/` 各算各的），冒烟跑挤不掉全量报告。
+
+> 每份约 2.6MB，上限约 130MB（20 成功 + 30 失败）。归档目录在 `.gitignore` 的 `reports/` 之下，不进仓库。
+> CI 不用这套：workflow 的 artifact 默认保留 90 天。
 
 ## 报告的默认语言
 

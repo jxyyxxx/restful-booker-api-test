@@ -114,4 +114,5 @@ def pytest_sessionfinish(session, exitstatus):
         logger.info("检测到 CI 环境，跳过本地 allure generate / allure open，报告由 workflow 生成")
         return
 
-    generate_local_report(scope=detect_scope(session))
+    generate_local_report(scope=detect_scope(session),
+                          started_at=getattr(session, "start_time", None))

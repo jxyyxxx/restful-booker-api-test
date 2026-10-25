@@ -36,6 +36,12 @@ CATEGORIES_SRC = os.path.join("config", "allure", "categories.json")
 HISTORY_ROOT = "reports/allure-history"
 HISTORY_KEEP = 20  # 趋势图与每条用例的历史，只保留最近 20 次运行
 
+# 报告归档：每次运行把 HTML 报告复制一份，便于事后回看"第 N 次"的现场。
+# allure-html 每次 generate --clean 都会覆盖，不归档就只剩最新一次。
+ARCHIVE_ROOT = "reports/archive"
+ARCHIVE_KEEP_PASS = 20  # 通过的运行只留最近 20 份
+ARCHIVE_KEEP_FAIL = 30  # 有 failed/broken 的运行留最近 30 份（防服务全挂时无限增长）
+
 # 这四个文件都是"每跑一次追加一条"的数组，截断时必须同步处理，否则各图点数会不一致
 TREND_FILES = (
     "history-trend.json",
@@ -291,21 +297,46 @@ def sync_history_out(report_dir=REPORT_DIR, scope="full"):
 
 # ---- 运行器 ----------------------------------------------------------------
 def _build_order(results_dir):
-    """本地口径的 buildOrder：第几次运行 = 已有历史条数 + 1"""
+    """
+    buildOrder：第几次运行 = 历史里最大的序号 + 1
+
+    不能用"历史条数 + 1"：历史只保留最近 20 条，跑到第 21 次时条数会一直
+    卡在 20，序号就停在 21 不再增长，趋势图横轴会重复、归档目录会重名。
+    """
     data = _read_json(os.path.join(results_dir, "history", "history-trend.json"))
-    return len(data) + 1 if isinstance(data, list) else 1
+    if not isinstance(data, list) or not data:
+        return 1
+
+    orders = []
+    for entry in data:
+        try:
+            orders.append(int(entry.get("buildOrder")))
+        except (AttributeError, TypeError, ValueError):
+            continue
+    return max(orders) + 1 if orders else 1
 
 
-def write_executor(results_dir=RESULTS_DIR, scope="full", collected=0):
+def _run_time_text(started_at):
+    """运行开始时间，标签里精确到秒（批量跑时相邻两次可能只差 30 秒）"""
+    moment = datetime.fromtimestamp(started_at) if started_at else datetime.now()
+    return moment.strftime("%m-%d %H:%M:%S")
+
+
+def write_executor(results_dir=RESULTS_DIR, scope="full", collected=0, started_at=None):
     """
     写 executor.json：报告的「运行器」面板 + 趋势图的横轴标签
 
     趋势图每个点靠 buildOrder 排序、靠 buildName 标注。缺这个文件时，
     历史条目里只有 data 没有名字，趋势图就是一串无名点——所以它和历史是一件事。
 
+    本地标签带运行时间（精确到秒），因为批量跑时相邻两次可能只差几十秒；
+    commit 不进标签（太长，环境面板的 framework_commit 里有）。
+    CI 标签用 run number，链接直接能跳到Actions，不再重复时间。
+
     :param results_dir: 结果目录（跟随实际 --alluredir）
     :param scope: 执行范围
     :param collected: 本次收集到的用例数，用于「全量40条」这样的标签
+    :param started_at: 本次会话开始时间（epoch 秒），用于标签上的时间
     :return: executor.json 的生成路径
     """
     scope_text = _scope_text(scope, collected)
@@ -328,8 +359,7 @@ def write_executor(results_dir=RESULTS_DIR, scope="full", collected=0):
         }
     else:
         order = _build_order(results_dir)
-        commit = _repo_commit()
-        label = f"本地 第{order}次 · {scope_text}" + (f" · {commit}" if commit else "")
+        label = f"本地 第{order}次 · {scope_text} · {_run_time_text(started_at)}"
         executor = {
             "name": "本地运行",
             "type": "local",
@@ -362,17 +392,101 @@ def prepare_allure_inputs(session):
         logger.info(f"暂无历史趋势（{scope} 首次运行）")
 
     write_allure_metadata(session, scope, results_dir)
-    write_executor(results_dir, scope, session.testscollected)
+    write_executor(results_dir, scope, session.testscollected,
+                   started_at=getattr(session, "start_time", None))
+
+
+# ---- 报告归档 --------------------------------------------------------------
+def _report_status(report_dir):
+    """
+    读报告自己的 summary.json 判定这次运行是 PASS 还是 FAIL
+
+    不在 pytest 侧数失败：session.testsfailed 分不清 failed/broken，
+    而 summary.json 是报告实际渲染用的口径，两边一定一致。
+
+    :return: "PASS" / "FAIL"；读不到 summary.json 时返回 None
+    """
+    data = _read_json(os.path.join(report_dir, "widgets", "summary.json"))
+    if not isinstance(data, dict):
+        return None
+
+    stat = data.get("statistic") or {}
+    bad = (stat.get("failed") or 0) + (stat.get("broken") or 0)
+    return "FAIL" if bad else "PASS"
+
+
+def _prune_archive(scope):
+    """按规则清理旧归档：通过的留最近 N 份，失败的留最近 N 份"""
+    base = os.path.join(ARCHIVE_ROOT, scope)
+    if not os.path.isdir(base):
+        return
+
+    names = sorted(
+        (name for name in os.listdir(base)
+         if os.path.isdir(os.path.join(base, name))),
+        # 按目录名里的序号（整数）排序，不依赖字符串补齐位数：
+        # 跑到第 1000 次时 "1000_..." 按字符会排到 "999_..." 前面
+        key=lambda name: int(name.split("_")[0]) if name.split("_")[0].isdigit() else 0,
+    )
+
+    for suffix, keep in (("_PASS", ARCHIVE_KEEP_PASS), ("_FAIL", ARCHIVE_KEEP_FAIL)):
+        if keep <= 0:
+            continue
+        group = [name for name in names if name.endswith(suffix)]
+        # 目录名里的序号是零填充的，字典序即运行顺序，最旧的排在最前
+        for name in group[:-keep]:
+            shutil.rmtree(os.path.join(base, name), ignore_errors=True)
+
+
+def archive_report(results_dir=RESULTS_DIR, report_dir=REPORT_DIR, scope="full", started_at=None):
+    """
+    把本次生成的报告复制一份到 reports/archive/{scope}/，供事后回看
+
+    目录名：{序号:03d}_{日期}_{时间}_{PASS|FAIL}
+      - 序号零填充，字典序即时间序，清理时直接切片
+      - FAIL 一眼可见，便于挑出有问题的运行
+
+    :return: 归档目录路径；判定失败或复制出错时返回 None
+    """
+    status = _report_status(report_dir)
+    if status is None:
+        logger.warning("读不到报告的 summary.json，跳过归档")
+        return None
+
+    executor = _read_json(os.path.join(results_dir, "executor.json")) or {}
+    try:
+        order = int(executor.get("buildOrder"))
+    except (TypeError, ValueError):
+        order = 0
+
+    moment = datetime.fromtimestamp(started_at) if started_at else datetime.now()
+    name = f"{order:03d}_{moment.strftime('%Y-%m-%d_%H-%M-%S')}_{status}"
+    dest = os.path.join(ARCHIVE_ROOT, scope, name)
+
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    if os.path.exists(dest):
+        shutil.rmtree(dest, ignore_errors=True)
+
+    try:
+        shutil.copytree(report_dir, dest)
+    except OSError as e:
+        logger.error(f"报告归档失败：{e}")
+        return None
+
+    _prune_archive(scope)
+    logger.info(f"报告已归档：{dest}")
+    return dest
 
 
 # ---- 报告生成 --------------------------------------------------------------
-def generate_local_report(results_dir=RESULTS_DIR, report_dir=REPORT_DIR, scope="full"):
+def generate_local_report(results_dir=RESULTS_DIR, report_dir=REPORT_DIR, scope="full", started_at=None):
     """
-    本地跑完测试后生成 Allure 报告、把历史存回仓库、设中文、打开浏览器
+    本地跑完测试后生成 Allure 报告、把历史存回仓库、归档报告、设中文、打开浏览器
 
     CI 里不要调用：workflow 会显式执行 allure generate，且没有浏览器可开。
 
-    :param scope: 执行范围，决定历史存进哪个子目录
+    :param scope: 执行范围，决定历史与归档存进哪个子目录
+    :param started_at: 会话开始时间（epoch 秒），用于归档目录名
     :return: True 表示报告已生成
     """
     report_index = os.path.join(report_dir, "index.html")
@@ -399,6 +513,9 @@ def generate_local_report(results_dir=RESULTS_DIR, report_dir=REPORT_DIR, scope=
         logger.info(f"历史趋势已保存：{history_dir(scope)}")
     else:
         logger.warning("报告里没有 history 目录，跳过历史保存")
+
+    # 归档一份：allure-html 下次会被 --clean 覆盖，不归档就查不到"第 N 次"的现场
+    archive_report(results_dir, report_dir, scope, started_at)
 
     if set_default_language(report_dir):
         logger.info("报告默认语言已设为中文，打开即中文界面")

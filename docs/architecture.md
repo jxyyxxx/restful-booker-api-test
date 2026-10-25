@@ -48,7 +48,8 @@ restful-booker_测试框架/
 ├── reports/                    # 7️⃣ 报告目录（已 gitignore，CI 产物走 artifact）
 │   ├── allure-results/         # Allure 结果文件（JSON，--clean-alluredir 每次重写）
 │   ├── allure-history/         # 历史趋势（按 scope 分目录，保留最近 20 次）
-│   └── allure-html/            # Allure HTML 报告（本地生成）
+│   ├── archive/                # 报告归档（按序号+时间+状态命名，失败 30 份 / 通过 20 份）
+│   └── allure-html/            # Allure HTML 报告（本地生成，每次覆盖）
 ├── conftest.py                 # 8️⃣ 夹具层（全局 fixture + 钩子注册）
 ├── pytest.ini                  # pytest 核心配置
 ├── run.py                      # 9️⃣ 执行入口
