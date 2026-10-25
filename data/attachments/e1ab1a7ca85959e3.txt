@@ -1,0 +1,14 @@
+[2026-10-25 04:07:09] [INFO] [logger.separator:111] ========== 开始执行用例：test_patch_booking ==========
+[2026-10-25 04:07:09] [INFO] [conftest.test_booking:82] 前置：创建测试预订...
+[2026-10-25 04:07:09] [INFO] [http_client.request:45] 发送请求：POST http://localhost:3001/booking
+[2026-10-25 04:07:09] [INFO] [http_client.request:57] 响应状态码：200，耗时：0.002s
+[2026-10-25 04:07:09] [INFO] [conftest.test_booking:86] 测试预订创建成功，ID：23
+[2026-10-25 04:07:09] [INFO] [http_client.request:45] 发送请求：GET http://localhost:3001/booking/23
+[2026-10-25 04:07:09] [INFO] [http_client.request:57] 响应状态码：200，耗时：0.002s
+[2026-10-25 04:07:09] [INFO] [http_client.request:45] 发送请求：PATCH http://localhost:3001/booking/23
+[2026-10-25 04:07:09] [INFO] [http_client.request:57] 响应状态码：200，耗时：0.002s
+[2026-10-25 04:07:09] [INFO] [conftest.test_booking:91] 后置：删除测试预订 ID=23...
+[2026-10-25 04:07:09] [INFO] [http_client.request:45] 发送请求：DELETE http://localhost:3001/booking/23
+[2026-10-25 04:07:09] [INFO] [http_client.request:57] 响应状态码：201，耗时：0.002s
+[2026-10-25 04:07:09] [INFO] [conftest.test_booking:93] 测试数据清理完成
+[2026-10-25 04:07:09] [INFO] [conftest.log_test_case:45] 用例执行完成：test_patch_booking
