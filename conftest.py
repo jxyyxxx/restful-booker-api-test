@@ -16,7 +16,7 @@ from api.booking_api import booking_api
 from common.data_factory import data_factory
 from common.http_client import http
 from common.logger import logger
-from common.reporting import generate_local_report, write_allure_metadata
+from common.reporting import detect_scope, generate_local_report, prepare_allure_inputs
 from config.settings import ADMIN_PWD, ADMIN_USER
 
 
@@ -94,21 +94,24 @@ def test_booking(admin_login):
 
 
 # ------------------------------------------------------------
-# 4. 会话结束：写报告元数据 + 本地生成报告
+# 4. 会话结束：准备报告输入 + 本地生成报告
 # ------------------------------------------------------------
 def pytest_sessionfinish(session, exitstatus):
     """
     测试会话结束后：
-    1. 写入环境面板与失败分类（本地和 CI 都需要）
-    2. 本地生成 Allure 报告、设中文、打开浏览器
+    1. 准备报告输入：拷历史（趋势）→ 环境面板 + 失败分类 → 运行器
+    2. 本地生成 Allure 报告、把本次历史存回仓库、设中文、打开浏览器
+
+    这些都放在会话结束时做，是为了避开 allure 的 --clean-alluredir：
+    它在会话开始时清空结果目录，先写会被清掉。
 
     CI 里跳过第 2 步：workflow 已显式生成报告，且没有浏览器可开；
     在其他 CI（Jenkins 等）上跑请设置 CI=true。
     """
-    write_allure_metadata(session)
+    prepare_allure_inputs(session)
 
     if os.getenv("CI"):
         logger.info("检测到 CI 环境，跳过本地 allure generate / allure open，报告由 workflow 生成")
         return
 
-    generate_local_report()
+    generate_local_report(scope=detect_scope(session))

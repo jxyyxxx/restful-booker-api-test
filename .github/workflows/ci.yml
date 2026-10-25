@@ -71,6 +71,25 @@ jobs:
       - name: 拉取代码
         uses: actions/checkout@v4
 
+      # 趋势图的数据来自上一份报告的 history/：Allure 只从 --alluredir 读历史，
+      # 所以要先复原到 reports/allure-history/full/，再由 conftest 在会话结束时
+      # 拷进结果目录。CI 只发布 main 上的全量结果，所以固定用 full 这一份历史。
+      - name: 恢复历史趋势（取 gh-pages 上上一份报告的 history）
+        run: |
+          mkdir -p reports/allure-history/full
+          if git fetch origin gh-pages --depth=1 2>/dev/null; then
+            git checkout origin/gh-pages -- history 2>/dev/null || true
+            if [ -d history ]; then
+              cp -r history/. reports/allure-history/full/
+              rm -rf history
+              echo "已恢复历史文件：$(ls reports/allure-history/full | wc -l) 个"
+            else
+              echo "gh-pages 上没有 history 目录，按首次运行处理"
+            fi
+          else
+            echo "gh-pages 分支不存在（首次运行），从零开始"
+          fi
+
       - name: 安装 Python ${{ env.PY_VERSION }}
         uses: actions/setup-python@v5
         with:
@@ -169,4 +188,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./allure-report
+          # 兜底：万一某次生成失败导致 publish_dir 里没有 history/，
+          # 保留 gh-pages 上的旧文件，趋势不会被清零（下一次再补上新的点）
+          keep_files: true
           commit_message: 'ci: 更新 Allure 报告 (${{ github.sha }})'

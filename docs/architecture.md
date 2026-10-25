@@ -18,7 +18,7 @@ restful-booker_测试框架/
 │   ├── masking.py              # 日志脱敏（password/token → ***）
 │   ├── data_loader.py          # YAML 数据加载（自动提取 case_name 作用例 ID）
 │   ├── logger.py               # 日志（单例，控制台+文件双输出）
-│   └── reporting.py            # Allure 报告（环境面板/失败分类/生成/默认中文）
+│   └── reporting.py            # Allure 报告（环境面板/失败分类/历史趋势/运行器/生成/默认中文）
 ├── config/                     # 3️⃣ 配置层
 │   ├── settings.py             # 环境、地址、账号、超时、时延门限、日志配置
 │   └── allure/
@@ -46,7 +46,8 @@ restful-booker_测试框架/
 │   └── pytest-config.md        # pytest.ini 逐项说明
 ├── logs/                       # 6️⃣ 日志文件（按 {环境}_{时间}.log 命名，已 gitignore）
 ├── reports/                    # 7️⃣ 报告目录（已 gitignore，CI 产物走 artifact）
-│   ├── allure-results/         # Allure 结果文件（JSON）
+│   ├── allure-results/         # Allure 结果文件（JSON，--clean-alluredir 每次重写）
+│   ├── allure-history/         # 历史趋势（按 scope 分目录，保留最近 20 次）
 │   └── allure-html/            # Allure HTML 报告（本地生成）
 ├── conftest.py                 # 8️⃣ 夹具层（全局 fixture + 钩子注册）
 ├── pytest.ini                  # pytest 核心配置

@@ -38,7 +38,6 @@ class TestBookingCreate:
                 assert_utils.assert_create_booking_success(res, case["data"])
         finally:
             # 数据自动回收：创建成功的预订在用例结束时删除（断言失败也照样执行）
-            # 不清理的话每跑一轮就往系统里堆 9 条左右预订，
             # GET /booking 的响应体会越来越大，后续用例和性能测试都会被污染
             booking_id = None
             if res.status_code == 200:

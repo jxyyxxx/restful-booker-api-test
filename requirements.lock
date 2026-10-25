@@ -1,6 +1,5 @@
 # 依赖锁：由干净虚拟环境解析出的精确版本（Python 3.13 / Linux 与 Windows 通用）
 # 用途：CI 用 `pip install -r requirements.lock` 安装，保证每次构建依赖完全一致，
-#      不会因为上游发小版本把流水线打红；本地开发可继续用 requirements.txt 的范围。
 # 更新方式（PowerShell）：
 #   python -m venv .lockenv
 #   .lockenv\Scripts\pip install -U pip

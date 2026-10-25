@@ -57,6 +57,7 @@ pytest -q                     # 安静模式
 
 - Allure 结果：`reports/allure-results/`（由 `pytest.ini` 的 `addopts` 自动生成）
 - HTML 报告：本地跑完由 `conftest.py` 的钩子自动 `allure generate` 并打开浏览器；也可手动 `allure open reports/allure-html`
+- 趋势数据：`reports/allure-history/{scope}/`（full / smoke / booking / auth 各一条线，保留最近 20 次），删掉即可重置对应趋势
 - 明细日志：`logs/{环境}_{时间}.log`，记录每个请求的 URL、方法、请求体、状态码、响应体、耗时
 
 **临时改被测地址**（不用改代码）：
