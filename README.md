@@ -1,22 +1,17 @@
 # Restful-Booker 接口自动化测试框架
 
-基于 restful-booker 酒店预订系统的 pytest 接口自动化测试框架：分层架构 + YAML 数据驱动 + Allure 报告 + GitHub Actions 持续集成。
+基于 restful-booker 酒店预订系统的 pytest 接口自动化框架：分层架构 + YAML 数据驱动 + Allure 报告（趋势 / 归档 / 失败分类）+ GitHub Actions。
 
 [![CI](https://github.com/jxyyxxx/restful-booker-api-test/actions/workflows/ci.yml/badge.svg)](https://github.com/jxyyxxx/restful-booker-api-test/actions/workflows/ci.yml)
 
 - 仓库地址：<https://github.com/jxyyxxx/restful-booker-api-test>
 - 在线 Allure 报告：<https://jxyyxxx.github.io/restful-booker-api-test/>
 
-| 项目 | 说明 |
-|------|------|
-| 用例规模 | 40 条（登录 15 / 查询 9 / 创建 11 / 修改 2 / 删除 1 / 权限 1 / 探活 1） |
-| 技术栈 | Python 3.11 / pytest / requests / PyYAML / Allure / GitHub Actions |
-| 被测系统 | restful-booker（Node.js + Express + LokiJS 内存数据库，8 个接口） |
-| 报告 | Allure（本地生成 + CI 自动发布到 GitHub Pages） |
+**40 条用例 · 8 个接口 · 全量执行 0.5~0.7 秒 · 冒烟 6 条约 0.4 秒 · 响应时间门禁 500ms**
 
 ## 快速开始
 
-### 1. 启动 restful-booker 服务
+### 1. 启动被测服务（Node 18+）
 
 ```cmd
 cd /d D:\restful-booker\restful-booker-main
@@ -25,92 +20,64 @@ npm install uuid@9.0.1
 npm start
 ```
 
-> `uuid@9.0.1` 是必须的：新版 uuid 是纯 ESM，而这个 CommonJS 服务直接 `require('uuid')`，不降版本会启动失败。
+> `uuid` 必须降到 9.x：新版是纯 ESM，这个 CommonJS 服务直接 `require('uuid')`，不降版本起不来。
+> 用 `npm start`（带 `SEED=true`，会灌 10 条种子数据）；直接 `node ./bin/www` 库是空的。
 
-### 2. 安装测试依赖
-
-```cmd
-pip install -r requirements.txt          # 本地开发：范围安装（下界/上界）
-pip install -r requirements.lock         # 想和 CI 完全一致：精确版本
-```
-
-### 3. 安装 Allure 命令行工具（生成 HTML 报告需要，需 Java 环境）
+### 2. 装依赖并运行
 
 ```cmd
-npm install -g allure-commandline@2.30.0
-allure --version
+cd /d D:\restful-booker\restful-booker_测试框架
+pip install -r requirements.lock     # 与 CI 完全一致；开发期可用 requirements.txt
+pytest
 ```
 
-### 4. 运行测试
+跑完由 `conftest.py` 的会话结束钩子自动 `allure generate` 并在浏览器打开报告。常用命令：
 
-```cmd
-python run.py                 # 入口文件，等价于 pytest
-pytest                        # 全量，40 条
-pytest -m smoke               # 冒烟集，6 条（探活 + 主链路，0.4 秒）
-pytest -m booking             # 预订模块，24 条
-pytest -m auth                # 登录模块，15 条
-pytest testcases/booking/     # 按目录跑
-pytest -q                     # 安静模式
-```
+| 命令 | 说明 |
+|------|------|
+| `pytest` | 全量 40 条 |
+| `pytest -m smoke` | 冒烟 6 条，约 0.4 秒 |
+| `pytest -m booking` / `-m auth` | 预订 24 条 / 登录 15 条 |
+| `pytest "testcases/booking/test_create.py::TestBookingCreate" -vv` | 跑单个类，调试用 |
+| `allure open reports/allure-html` | 手动打开报告（**别双击 index.html**） |
 
-### 5. 查看报告与日志
+临时改被测地址不用改代码：`set BASE_URL=http://192.168.1.20:3001 && pytest`（bash 用 `BASE_URL=... pytest`）。
 
-- Allure 结果：`reports/allure-results/`（由 `pytest.ini` 的 `addopts` 自动生成）
-- HTML 报告：本地跑完由 `conftest.py` 的钩子自动 `allure generate` 并打开浏览器；也可手动 `allure open reports/allure-html`
-- 趋势数据：`reports/allure-history/{scope}/`（full / smoke / booking / auth 各一条线，保留最近 20 次），删掉即可重置对应趋势
-- 报告归档：`reports/archive/{scope}/{序号}_{时间}_{PASS|FAIL}/`，`allure-html` 每次被覆盖，归档用来回看某一次的现场（失败留 30 份、通过留 20 份）
-- 明细日志：`logs/{环境}_{时间}.log`，记录每个请求的 URL、方法、请求体、状态码、响应体、耗时
-
-**临时改被测地址**（不用改代码）：
-
-```powershell
-$env:BASE_URL = 'http://192.168.1.20:3001'; pytest -q    # PowerShell
-set BASE_URL=http://192.168.1.20:3001 && pytest -q       # cmd
-BASE_URL=http://192.168.1.20:3001 pytest -q              # bash
-```
-
-## 用例清单与规模（共 40 条）
+## 用例清单（40 条）
 
 | 模块 | 文件 | 条数 | 标记 | 覆盖内容 |
 |------|------|------|------|----------|
-| 健康检查 | `health/test_ping.py` | 1 | `smoke` | `/ping` 返回 201（非 200），确认服务在线，同时校验响应时间门禁 |
-| 登录 | `auth/test_login.py` | 15 | `auth` + `smoke`×1 | 正向登录、密码错误（含空/简单密码）、用户名空/空格/不存在、用户名密码均错、特殊字符、超长输入；token 格式校验 |
-| 查询 | `booking/test_query.py` | 9 | `booking` + `smoke`×1 | 列表：自建数据后查列表，非空且每条含 `bookingid`；详情：自建数据查自己（200）+ 7 条不存在/非法 ID（404：0、负数、超大值） |
-| 创建 | `booking/test_create.py` | 11 | `booking` | 完整数据、缺可选字段、英文姓名、价格 0/超大值、firstname 空、特殊字符；逐个缺必填字段（期望 500） |
+| 健康检查 | `health/test_ping.py` | 1 | `smoke` | `/ping` 返回 201（非 200），确认服务在线 |
+| 登录 | `auth/test_login.py` | 15 | `auth` + `smoke`×1 | 正向登录、密码错误（空/简单）、用户名空/空格/不存在、两者均错、特殊字符、超长输入；token 格式 |
+| 查询 | `booking/test_query.py` | 9 | `booking` + `smoke`×1 | 列表：自建数据后查列表，非空且每条含 `bookingid`；详情：自建数据查自己（200）+ 7 条非法 ID（404） |
+| 创建 | `booking/test_create.py` | 11 | `booking` | 完整、缺可选字段、英文姓名、价格 0/超大、firstname 空、特殊字符；逐个缺必填字段（期望 500） |
 | 修改 | `booking/test_update.py` | 2 | `booking` + `smoke`×2 | PUT 全量修改；PATCH 只改部分字段并验证未改字段不变 |
 | 删除 | `booking/test_delete.py` | 1 | `booking` + `smoke`×1 | 删除返回 201，删除后查询返回 404 |
 | 权限 | `booking/test_permission.py` | 1 | `booking` | 未认证修改返回 403，并清理造出的数据 |
 
 > 设计原则：每条数据对应一个独立场景（等价类 / 边界值 / 异常输入），不用重复数据凑条数。
 
-## 用例分层与标记
+冒烟集 = `/ping` 探活 + 正向登录 + 查询列表 + PUT + PATCH + 删除，创建由 `test_booking` 夹具间接触发。
+`smoke` 只打在非参数化函数上——参数化一个函数会展开成十几条，整体打标会让粒度失效。
 
-| 标记 | 打在哪 | 命中条数 | 命令 |
-|------|--------|----------|------|
-| `smoke` | 探活 + 主链路 6 条用例 | 6 | `pytest -m smoke` |
-| `booking` | 5 个预订模块测试类（类级） | 24 | `pytest -m booking` |
-| `auth` | 登录模块测试类（类级） | 15 | `pytest -m auth` |
-| `regression` | 预留，暂未使用 | 0 | — |
+## 踩过的坑
 
-**冒烟集 = `/ping` 探活 + 正向登录（token 格式）+ 查询列表 + PUT 全量修改 + PATCH 部分修改 + 删除**，跑一遍等于先确认服务在线，再走完「登录 → 创建 → 查询 → 修改 → 删除」主链路（创建由 `test_booking` fixture 间接触发），耗时约 0.4 秒。
+- **服务没起时先红一屏 `ConnectionError`**：`/ping` 按文件名排在最后，前面 39 条集体报连接失败。改成 `pytest_collection_modifyitems` 把 `testcases/health/` 提到收集最前。
+- **趋势图永远只有一个点**：`history/` 放在结果目录里，被 `--clean-alluredir` 每次清空。挪到 `reports/allure-history/{scope}/`；`buildOrder` 取"历史里最大序号 + 1"而不是"条数 + 1"，否则第 21 次起横轴重复、归档重名。
+- **数据泄漏 13 条/轮**：`GET /booking` 响应体越来越大，后续用例和压测都被污染。三条回收路径：夹具 `yield` 后置、创建用例 `finally`、会中断的用例兜底删除。
+- **流水线自己变红**：上游 main 一提交，CI 就跑出无法复现的失败。锁 `SERVICE_COMMIT` + `requirements.lock`。
+- **`--strict-markers` 只管装饰器**：`@pytest.mark.smooke` 立即报错，但 `pytest -m smooke` 拦不住——结果是 40 deselected + 退出码 5。
+- **报告白屏**：`file://` 协议下数据加载失败，必须 `allure open`；另外 `reports/allure-results` 是唯一真源，命令行不要再额外传 `--alluredir`。
 
-> `/ping` 能排在最前，是 `conftest.py` 的 `pytest_collection_modifyitems` 把 health 模块提到收集结果最前；否则按文件名排序它会在最后，服务挂掉时先红的是一屏连接错误。
-
-两个容易踩的点：
-
-1. **冒烟标记只打在非参数化函数上**。参数化用例（登录 14 条、创建 11 条、查询详情 7 条）不能整体打 `smoke`，否则 14 条登录数据会全部变成冒烟，粒度就废了。
-2. **`--strict-markers` 只管装饰器，不管命令行**。写 `@pytest.mark.smooke` 会直接报错；但 `pytest -m smooke` 拦不住，结果是 `40 deselected` + 退出码 5（"没收集到用例"）——CI 照样会红，只是提示不如前者清楚。
-
-## 文档索引
+## 文档
 
 | 文档 | 内容 |
 |------|------|
-| [docs/architecture.md](docs/architecture.md) | 目录结构、分层职责、环境与接口、fixture、框架特性、依赖管理 |
-| [docs/allure.md](docs/allure.md) | 报告里有什么（环境面板/scope/分类/严重级别/步骤）、默认中文、报告不更新怎么办 |
-| [docs/ci.md](docs/ci.md) | 触发方式与分层、手动触发、执行步骤、关键约定、本地与 CI 差异 |
-| [docs/pytest-config.md](docs/pytest-config.md) | `pytest.ini` 逐项说明 |
+| [docs/architecture.md](docs/architecture.md) | 三个关键设计（分层 / 数据回收 / 双门禁断言）及其代价 |
+| [docs/allure.md](docs/allure.md) | 报告：环境面板、scope、趋势、归档、失败分类、默认中文 |
+| [docs/ci.md](docs/ci.md) | 流水线：触发分层、锁版本、本地与 CI 差异 |
 
-## 项目结构（顶层）
+## 项目结构
 
 ```
 api/          接口方法层（与业务接口一一对应）
@@ -118,8 +85,7 @@ common/       工具层（HTTP 封装、断言、数据工厂、脱敏、日志�
 config/       配置层（环境、时延门限、Allure 分类规则）
 data/         数据层（YAML，按模块分目录）
 testcases/    用例层（health / auth / booking）
-docs/         文档（架构、报告、CI、pytest 配置）
-conftest.py   夹具与钩子
+conftest.py   夹具层（全局 fixture + 钩子）
 pytest.ini    pytest 配置
 run.py        执行入口
 ```

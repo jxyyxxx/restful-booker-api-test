@@ -1,13 +1,13 @@
 # 架构与核心机制
 
-本文说明框架的分层、目录、配置、夹具与关键机制。命令与用例清单见根目录 [README.md](../README.md)，报告细节见 [allure.md](allure.md)，流水线见 [ci.md](ci.md)。
+本文说明框架的分层、目录、配置、夹具与三个关键设计的取舍。命令与用例清单见根目录 [README.md](../README.md)，报告细节见 [allure.md](allure.md)，流水线见 [ci.md](ci.md)。
 
 ## 目录结构
 
 ```
 restful-booker_测试框架/
 ├── .github/workflows/
-│   └── ci.yml                  # CI 流水线：拉起被测服务 → 跑用例 → 发布 Allure 报告
+│   └── ci.yml                  # CI：拉起被测服务 → 跑用例 → 发布 Allure 报告
 ├── api/                        # 1️⃣ 接口方法层（与业务接口一一对应）
 │   ├── auth_api.py             # 登录接口封装
 │   └── booking_api.py          # 预订接口封装
@@ -17,7 +17,7 @@ restful-booker_测试框架/
 │   ├── data_factory.py         # 测试数据工厂（随机造数、入住/离店日期）
 │   ├── masking.py              # 日志脱敏（password/token → ***）
 │   ├── data_loader.py          # YAML 数据加载（自动提取 case_name 作用例 ID）
-│   ├── logger.py               # 日志（单例，控制台+文件双输出）
+│   ├── logger.py               # 日志（单例，控制台 + 文件双输出）
 │   └── reporting.py            # Allure 报告（环境面板/失败分类/历史趋势/运行器/生成/默认中文）
 ├── config/                     # 3️⃣ 配置层
 │   ├── settings.py             # 环境、地址、账号、超时、时延门限、日志配置
@@ -42,13 +42,12 @@ restful-booker_测试框架/
 ├── docs/
 │   ├── architecture.md         # 本文
 │   ├── allure.md               # 报告说明
-│   ├── ci.md                   # 流水线说明
-│   └── pytest-config.md        # pytest.ini 逐项说明
-├── logs/                       # 6️⃣ 日志文件（按 {环境}_{时间}.log 命名，已 gitignore）
+│   └── ci.md                   # 流水线说明
+├── logs/                       # 6️⃣ 日志文件（{环境}_{时间}.log，已 gitignore）
 ├── reports/                    # 7️⃣ 报告目录（已 gitignore，CI 产物走 artifact）
-│   ├── allure-results/         # Allure 结果文件（JSON，--clean-alluredir 每次重写）
+│   ├── allure-results/         # Allure 结果文件（--clean-alluredir 每次重写）
 │   ├── allure-history/         # 历史趋势（按 scope 分目录，保留最近 20 次）
-│   ├── archive/                # 报告归档（按序号+时间+状态命名，失败 30 份 / 通过 20 份）
+│   ├── archive/                # 报告归档（序号+时间+状态，失败 30 份 / 通过 20 份）
 │   └── allure-html/            # Allure HTML 报告（本地生成，每次覆盖）
 ├── conftest.py                 # 8️⃣ 夹具层（全局 fixture + 钩子注册）
 ├── pytest.ini                  # pytest 核心配置
@@ -58,8 +57,45 @@ restful-booker_测试框架/
 └── README.md
 ```
 
-**依赖方向是单向的**：用例层 → 接口方法层 → 工具层 → 配置层。
-接口路径变了只改 `api/`；断言规则变了只改 `common/assert_utils.py`；测试数据变了只改 YAML；用例本身几乎不动。
+## 三个关键设计
+
+### 1. 分层：依赖单向，改一处不动三处
+
+依赖方向只有一条：**用例层 → 接口方法层 → 工具层 → 配置层**。
+
+- 接口路径变了 → 只改 `api/`
+- 断言规则变了 → 只改 `common/assert_utils.py`
+- 测试数据变了 → 只改 YAML
+- 换环境 / 调门限 → 只改环境变量，代码一行不动
+
+**代价**：多一层跳转，读一条用例要跨 2~3 个文件。40 条规模下这笔成本是划算的；如果只有 5 条用例，这样分层属于过度设计——这一点在面试里要主动讲，否则会被当成"为了分层而分层"。
+
+### 2. 测试数据：声明式造数 + 三条回收路径
+
+正向用例**全部自己造数据**，不依赖服务的种子数据：查询列表、查询详情都先建一条再查。否则换一种启动方式（不设 `SEED=true`）就会出现"ID=1 查不到"的假失败。
+
+回收有三条路径，对应三种失败方式：
+
+| 路径 | 用在哪 | 为什么 |
+|------|--------|--------|
+| `test_booking` 夹具的 `yield` 后置 | 查询、修改类用例 | 前置/后置写在一处，用例里看不到清理代码 |
+| 用例内 `finally` 删除 | 创建类用例（11 条中的 7 条正向） | 断言失败也要删，`finally` 是唯一保证 |
+| 兜底再删一次 | 删除、未认证 403 | 这两条会中途切换登录态或提前删除，异常路径必须补一刀 |
+
+不做回收的后果是可量化的：**每跑一轮泄漏 13 条预订**（7 条创建用例 + 6 条夹具/自建数据），`GET /booking` 的响应体越来越大，后续用例变慢，性能测试结果也会被污染（压测报告里记为"测试自污染"）。
+
+> `test_booking` 依赖 `admin_login`（删除需要认证）。凡是自己清理数据的用例都必须**显式声明** `admin_login`，否则进用例时可能还没登录、`finally` 里删不掉——`test_permission` 里专门注释了这个坑。
+
+### 3. 断言：功能与时延双门禁
+
+接口测试通常只验"对不对"，这里补上"快不快"：`assert_response_time()` 给每个关键请求加了单次耗时上限，默认 **500ms**，可用 `RESPONSE_TIME_LIMIT` 覆盖。
+
+- **覆盖范围**：`/ping`、`/auth`、查询列表/详情、创建、PUT、PATCH、删除、未认证 403；
+- **失败信息**：带实际耗时与阈值，例如 `响应时间超限：GET /ping 耗时 7ms，超过阈值 0.1ms`；
+- **阈值为什么取 500ms**：本地实测 2~20ms，留了一个数量级以上的余量——能拦住明显劣化（5ms → 800ms），又不会因 CI 机器抖动误报；
+- **失败要能分类**：时延超限必须落进「响应时间门禁超限」，不能混进「断言失败」，否则值班的人会去改代码而不是查性能。`config/allure/categories.json` 里用负向断言保证三条规则互斥。
+
+它和 JMeter 的分工：**这边拦回归劣化，那边测容量上限**，两者不重复。
 
 ## 环境信息
 
@@ -68,7 +104,7 @@ restful-booker_测试框架/
 | 本地服务地址 | `http://localhost:3001` |
 | 管理员账号 | `admin` / `password123` |
 | 认证方式 | Cookie（`token=xxx`），由 `requests.Session` 自动管理 |
-| 环境切换 | 环境变量 `ENV` 决定（白名单只有 `local`，写错直接 `ValueError`）；`BASE_URL` / `ADMIN_USER` / `ADMIN_PWD` 可覆盖默认值，改环境不用改代码 |
+| 环境切换 | 环境变量 `ENV` 决定（白名单只有 `local`，写错直接 `ValueError`）；`BASE_URL` / `ADMIN_USER` / `ADMIN_PWD` 可覆盖默认值 |
 | 响应时间门禁 | 默认 500ms，可用 `RESPONSE_TIME_LIMIT` 覆盖 |
 
 > 本项目只跑本地服务（`npm start` 或 `docker compose up`），不维护在线环境。
@@ -77,11 +113,11 @@ restful-booker_测试框架/
 
 | 接口 | 方法 | 说明 | 是否需要认证 |
 |------|------|------|--------------|
-| `/ping` | GET | 健康检查（返回 **201**，不是 200；已覆盖用例） | 否 |
-| `/auth` | POST | 登录获取 token | 否 |
+| `/ping` | GET | 健康检查（返回 **201**，不是 200） | 否 |
+| `/auth` | POST | 登录获取 token（失败也返回 **200**，靠 `reason` 区分） | 否 |
 | `/booking` | GET | 查询预订列表 | 否 |
 | `/booking/{id}` | GET | 查询预订详情 | 否 |
-| `/booking` | POST | 创建预订 | 否 |
+| `/booking` | POST | 创建预订（缺必填字段返回 **500**） | 否 |
 | `/booking/{id}` | PUT | 修改预订（全量） | ✅ 是 |
 | `/booking/{id}` | PATCH | 修改预订（部分） | ✅ 是 |
 | `/booking/{id}` | DELETE | 删除预订（成功返回 **201**） | ✅ 是 |
@@ -92,49 +128,21 @@ restful-booker_测试框架/
 |---------|--------|------|
 | `log_test_case` | function | 每个用例开始/结束打分隔日志（`autouse=True` 自动执行） |
 | `admin_login` | session | 管理员登录一次，把 token 写入 `Session.cookies`，后续请求自动带认证 |
-| `test_booking` | function | 用 `yield` 实现前置造数 + 后置清理：用例前创建一条预订并返回 ID，用例结束后删除（用例失败也执行） |
+| `test_booking` | function | `yield` 实现前置造数 + 后置清理：用例前创建一条预订并返回 ID，用例结束后删除（用例失败也执行） |
 
-**依赖关系**：`test_booking` 依赖 `admin_login`（删除接口需要认证）。凡是要清理数据的用例都必须显式声明 `admin_login`，否则进用例时可能还没登录、`finally` 里删不掉，导致数据泄漏。
+## 其它实现细节
 
-## 框架特性
+### 数据驱动与动态用例标题
 
-### 1. 接口方法层封装
-用例层不直接调 `http.get/post`，而是调 `booking_api.create_booking()` 这类业务方法；接口路径或参数变化时只改 `api/` 一个文件。
-
-### 2. YAML 数据驱动 + 动态用例标题
 测试数据按模块、按接口拆成独立 YAML，每条数据自带 `case_name`，作为 pytest 参数化 ID。
-Allure 标题用 `allure.dynamic.title(f"...-{case_name}")` 在用例内部设置——**不能用 `@allure.title("{case_name}")`**，因为参数化传进来的是整个 dict，装饰器占位符取不到 dict 内部字段，报告里会原样显示成 `{case_name}`。
 
-### 3. 断言工具
-`AssertUtils` 统一状态码、字段存在、字段值、列表类型、组合断言（如 `assert_create_booking_success`）等，报错信息带实际值，每个断言在报告里都是一个步骤。
+Allure 标题用 `allure.dynamic.title(f"...-{case_name}")` 在用例内部设置——**不能用 `@allure.title("{case_name}")`**：参数化传进来的是整个 dict，装饰器占位符取不到 dict 内部字段，报告里会原样显示成 `{case_name}`。
 
-### 4. 日志系统
-每次请求记录 URL、方法、请求体、状态码、响应体（截断 500 字符）、耗时；日志文件按环境+时间命名，方便按次排查。
-请求体与响应体在写日志前会做**脱敏**（`password` / `token` / `authorization` / `cookie` → `***`），避免 `/auth` 的明文密码落进日志文件。
+### 日志与脱敏
 
-### 5. 测试数据自动回收
-三条回收路径：
+每次请求记录 URL、方法、请求体、状态码、响应体（截断 500 字符）、耗时；日志文件按 `{环境}_{时间}.log` 命名，方便按次排查。
 
-- `test_booking` fixture 的 `yield` 后置清理（查询详情、修改类用例）；
-- 创建类用例在 `finally` 里删除自己创建的预订；
-- 会失败中断的用例（如删除、未认证 403）在 `finally` 里做一次**兜底删除**。
-
-不回收的后果很具体：每跑一轮就往系统里堆 9 条左右的预订，`GET /booking` 的响应体越来越大，后续用例和性能测试都会被污染（性能测试报告里记为"测试自污染"）。
-
-> 正向用例全部**自己造数据**（列表、详情都先建一条再查），不依赖服务启动时的种子数据——
-> 否则换一种启动方式（不设 `SEED=true`）就会出现"ID=1 查不到"的假失败。
-
-### 6. 用例按功能细分
-一个测试文件只测一个功能，职责单一，好找好改。
-
-### 7. 响应时间门禁
-`AssertUtils.assert_response_time()` 给关键接口加了单次耗时上限：默认 500ms，可用环境变量 `RESPONSE_TIME_LIMIT` 覆盖。
-
-- **覆盖范围**：`/ping`、`/auth`、查询列表与详情、创建、PUT、PATCH、删除、未认证 403；
-- **失败信息**：带实际耗时与阈值，例如 `响应时间超限：GET /ping 耗时 7ms，超过阈值 0.1ms`；
-- **阈值为什么取 500ms**：本地实测 2~20ms，留了一个数量级以上的余量——既能拦住明显劣化（比如某次改动让接口从 5ms 涨到 800ms），又不会因为 CI 机器抖动误报。
-
-它让功能用例同时具备"对不对"和"快不快"两个维度，与 JMeter 的性能测试形成互补：这边拦**回归劣化**，那边测**容量上限**。
+请求体与响应体在写日志前统一脱敏（`password` / `token` / `authorization` / `cookie` → `***`），避免 `/auth` 的明文密码落进日志文件——这是日志工具里最容易漏的一环，脱敏放在 `common/masking.py` 单独一层，HTTP 封装只负责调用。
 
 ## 依赖管理
 
