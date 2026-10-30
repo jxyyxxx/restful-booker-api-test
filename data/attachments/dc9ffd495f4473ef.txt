@@ -1,0 +1,4 @@
+[2026-10-30 05:13:56] [INFO] [logger.separator:111] ========== 开始执行用例：test_ping ==========
+[2026-10-30 05:13:56] [INFO] [http_client.request:45] 发送请求：GET http://localhost:3001/ping
+[2026-10-30 05:13:56] [INFO] [http_client.request:57] 响应状态码：201，耗时：0.005s
+[2026-10-30 05:13:56] [INFO] [conftest.log_test_case:45] 用例执行完成：test_ping
