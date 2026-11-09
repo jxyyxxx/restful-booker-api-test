@@ -1,1 +1,1 @@
-{"reportName":"CI #60","testRuns":[],"statistic":{"failed":0,"broken":0,"skipped":0,"passed":40,"unknown":0,"total":40},"time":{"start":1794115805597,"stop":1794115805950,"duration":353,"minDuration":2,"maxDuration":26,"sumDuration":190}}
+{"reportName":"CI #61","testRuns":[],"statistic":{"failed":0,"broken":0,"skipped":0,"passed":40,"unknown":0,"total":40},"time":{"start":1794202890077,"stop":1794202890294,"duration":217,"minDuration":1,"maxDuration":11,"sumDuration":113}}
