@@ -1,0 +1,27 @@
+# ============================================================
+# 修改预订接口测试数据
+# 对应测试用例：testcases/booking/test_update.py
+# 说明：这里是一个字典（不是列表），用 data_loader.load() 读取后按 key 取：
+#   put   —— PUT 全量修改用的完整请求体（六个必填字段齐全）
+#   patch —— PATCH 局部修改用的请求体（只给一个字段）
+#
+# 设计要点：
+#   - PUT 是全量替换，请求体必须给全，否则服务端校验失败返回 400（POST 同样情况是 500）
+#   - PATCH 不校验字段完整性，只做顶层 Object.assign；
+#     如果传 bookingdates 只给 checkin，整个 bookingdates 会被替换掉，
+#     checkout 丢失后在回显阶段变成 "0NaN-aN-aN" —— 这是被测服务的缺陷，
+#     用例里单独有一条 test_patch_bookingdates_overwrites 记录它
+# ============================================================
+
+put:
+  firstname: "改后名"
+  lastname: "改后姓"
+  totalprice: 888
+  depositpaid: false
+  bookingdates:
+    checkin: "2026-09-01"
+    checkout: "2026-09-05"
+  additionalneeds: "换房"
+
+patch:
+  firstname: "局部改"

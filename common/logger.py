@@ -6,8 +6,28 @@
 
 import logging
 import os
+import sys
 from datetime import datetime
 from config.settings import ENV, LOG_CONFIG
+
+
+class _ConsoleHandler(logging.StreamHandler):
+    """
+    控制台 handler：每次输出时重新取 sys.stderr，并吞掉"流已关闭"的异常
+
+    不能直接用 logging.StreamHandler()：它在构造时就把 sys.stderr 存进 self.stream。
+    pytest 的捕获在收集失败 / 中断这类场景下会提前关闭捕获流，之后 sessionfinish
+    里再打日志就会抛 `ValueError: I/O operation on closed file`，
+    CI 日志里会刷一屏 "--- Logging error ---"（不影响用例结果，但会盖住真正的报错）。
+    改为 emit 时取当前流；如果取到的仍是已关闭的流，静默跳过——文件日志照常写入。
+    """
+
+    def emit(self, record):
+        try:
+            self.stream = sys.stderr
+            super().emit(record)
+        except (ValueError, OSError):
+            pass
 
 
 class Logger:
@@ -64,7 +84,7 @@ class Logger:
         )
 
         # 控制台输出（级别从配置读取）
-        console_handler = logging.StreamHandler()
+        console_handler = _ConsoleHandler()
         console_handler.setLevel(self._get_level(LOG_CONFIG["console_level"]))
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
