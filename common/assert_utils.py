@@ -71,6 +71,15 @@ class AssertUtils:
             assert actual == expected_value, \
                 f"字段 {field_name} 值不符：预期 {expected_value}，实际 {actual}"
 
+    def assert_field_absent(self, data, field_name):
+        """
+        断言字典中不存在某个字段（如登录失败时不能出现 token）
+        :param data: 字典数据
+        :param field_name: 字段名
+        """
+        with allure.step(f"断言：响应不包含字段 {field_name}"):
+            assert field_name not in data, f"响应不应包含字段 {field_name}，实际：{data}"
+
     def assert_is_list(self, data):
         """断言数据是列表类型"""
         with allure.step("断言：响应是列表"):
@@ -81,6 +90,37 @@ class AssertUtils:
         """断言列表不为空"""
         with allure.step("断言：列表不为空"):
             assert len(data) > 0, "列表不应该为空"
+
+    def assert_list_empty(self, data):
+        """断言列表为空（过滤无匹配时应返回 []，而不是 404 或 null）"""
+        with allure.step("断言：列表为空"):
+            assert isinstance(data, list), f"响应应该是列表，实际是 {type(data).__name__}"
+            assert len(data) == 0, f"列表应该为空，实际有 {len(data)} 条"
+
+    def assert_list_contains_id(self, data, booking_id):
+        """断言列表里包含指定 bookingid（列表接口只返回 id，所以按 id 比对）"""
+        with allure.step(f"断言：列表包含 bookingid={booking_id}"):
+            ids = [item.get("bookingid") for item in data]
+            assert booking_id in ids, f"列表中没有 {booking_id}，前 5 条：{ids[:5]}"
+
+    def assert_list_not_contains_id(self, data, booking_id):
+        """断言列表里不含指定 bookingid（用于过滤/删除后的反向验证）"""
+        with allure.step(f"断言：列表不包含 bookingid={booking_id}"):
+            ids = [item.get("bookingid") for item in data]
+            assert booking_id not in ids, f"列表不应包含 {booking_id}，实际前 5 条：{ids[:5]}"
+
+    def assert_body_contains(self, response, text):
+        """断言响应体包含指定文本（XML / 表单等非 JSON 响应用）"""
+        with allure.step(f"断言：响应体包含 {text!r}"):
+            assert text in response.text, \
+                f"响应体不含 {text!r}，实际前 200 字符：{response.text[:200]!r}"
+
+    def assert_content_type(self, response, expected_prefix):
+        """断言 Content-Type 前缀，例如 application/json、text/html"""
+        with allure.step(f"断言：Content-Type 以 {expected_prefix} 开头"):
+            actual = response.headers.get("Content-Type", "")
+            assert actual.startswith(expected_prefix), \
+                f"Content-Type 不符：预期 {expected_prefix}*，实际 {actual}"
 
     def assert_booking_fields(self, data):
         """

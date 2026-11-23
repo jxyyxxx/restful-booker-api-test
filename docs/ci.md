@@ -6,9 +6,9 @@
 
 | 事件 | 跑什么 | 报告 scope |
 |------|--------|-----------|
-| `push`（任意分支） | 全量 40 条 | `full` |
+| `push`（任意分支） | 全量 69 条 | `full` |
 | `pull_request` | 冒烟集 6 条（约 0.4 秒） | `smoke` |
-| `schedule`（每天 00:00 UTC = 北京 08:00） | 全量 40 条 | `full` |
+| `schedule`（每天 00:00 UTC = 北京 08:00） | 全量 69 条 | `full` |
 | `workflow_dispatch`（手动） | 下拉框自选：`scope` = full / smoke，`python` = 3.11 / 3.13 | 跟随选择 |
 
 PR 只跑冒烟是为了给提交快速反馈；`main` 的 push 与定时任务仍跑全量，保证线上报告是完整结果。

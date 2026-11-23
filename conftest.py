@@ -89,8 +89,68 @@ def test_booking(admin_login):
 
     # 用例执行完后一定会执行（哪怕用例失败）
     logger.info(f"后置：删除测试预订 ID={booking_id}...")
-    booking_api.delete_booking(booking_id)
+    res = booking_api.delete_booking(booking_id)
+    # 405 = 数据已被用例自己删掉（如重复删除用例），属于正常情况，不该让清理阶段报错
+    if res.status_code not in (201, 405):
+        logger.warning(f"测试数据清理失败：ID={booking_id}，状态码 {res.status_code}")
+        return
     logger.info("测试数据清理完成")
+
+
+# ------------------------------------------------------------
+# 3.5 指定字段的预订：过滤/修改类用例需要可控数据，随机数据无法断言行不行
+#     scope="function"，yield 一个工厂函数，用例结束统一清理
+# ------------------------------------------------------------
+@pytest.fixture(scope="function")
+def make_booking(admin_login):
+    """
+    返回造数工厂：make_booking(**overrides) -> (booking_id, data)
+
+    用指定字段覆盖随机数据造一条预订，用例结束后自动删除。
+    例：bid, data = make_booking(firstname="筛选甲", bookingdates={...})
+    """
+    created = []
+
+    def _make(**overrides):
+        booking_data = data_factory.random_booking_data()
+        booking_data.update(overrides)
+        res = booking_api.create_booking(booking_data)
+        booking_id = res.json().get("bookingid")
+        created.append(booking_id)
+        return booking_id, booking_data
+
+    yield _make
+
+    for booking_id in created:
+        res = booking_api.delete_booking(booking_id)
+        if res.status_code not in (201, 405):
+            logger.warning(f"自定义预订清理失败：ID={booking_id}，状态码 {res.status_code}")
+
+
+# ------------------------------------------------------------
+# 3.6 未认证 / 无效 token：权限用例需要"没有有效凭证"的会话
+#     全局 Session 里带着 admin 的 token，临时摘掉或换成假值，用例结束恢复
+# ------------------------------------------------------------
+@pytest.fixture
+def anonymous():
+    """临时清掉 Session 里的 token，模拟未认证请求"""
+    token = http.session.cookies.get("token")
+    http.session.cookies.clear()
+    yield
+    if token:
+        http.session.cookies.set("token", token)
+
+
+@pytest.fixture
+def invalid_token():
+    """把 token 换成无效值，模拟 token 错误 / 过期"""
+    token = http.session.cookies.get("token")
+    http.session.cookies.set("token", "invalid-token-for-test")
+    yield
+    if token:
+        http.session.cookies.set("token", token)
+    else:
+        http.session.cookies.clear()
 
 
 # ------------------------------------------------------------

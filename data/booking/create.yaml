@@ -1,17 +1,18 @@
 # ============================================================
-# 创建预订接口测试数据（共 11 条）
-# 对应测试用例：testcases/booking/test_create.py
+# 创建预订接口测试数据（共 9 条：正向 5 + 反向 4）
+# 对应测试用例：testcases/booking/test_create.py::TestBookingCreate
 # 字段说明：
 #   case_name: 用例名称（会自动作为测试报告里的用例名）
 #   expected_code: 预期HTTP状态码
 #   data: 请求体数据
 # 设计说明：
-#   正向覆盖「必填齐全」「可选字段缺失」「零值 / 超大值 / 空字符串 / 特殊字符」等边界；
-#   反向逐个删掉一个必填字段（lastname / totalprice / depositpaid / bookingdates），
-#   restful-booker 校验失败时返回 500。每条数据对应一个独立场景，不用重复数据凑条数。
+#   校验规则是 validate.js 的 {presence: true}，只拦 null/undefined，
+#   不拦空字符串、0、false —— 所以 firstname="" 和 totalprice=0 都能创建成功（200），
+#   而"少传字段"才会 500（注意：POST 校验失败返回 500，PUT 同样情况返回 400）。
+#   这里只放"用数据就能表达"的场景；需要断言回显值、内容协商、类型异常的用例
+#   写在用例代码里（见 test_create.py 的另外三个类）。
 # 注意：
-#   创建成功的用例会在用例内自动删除自己创建的预订（见 test_create.py 的 finally 分支），
-#   否则每跑一轮就会往系统里堆数据，影响后续用例与性能测试结果。
+#   创建成功的用例会在 finally 里删除自己造的数据，否则每跑一轮都会污染列表接口。
 # ============================================================
 
 - case_name: "正向-完整数据创建预订"
@@ -37,18 +38,6 @@
       checkin: "2024-06-01"
       checkout: "2024-06-10"
 
-- case_name: "正向-英文姓名创建预订"
-  expected_code: 200
-  data:
-    firstname: "John"
-    lastname: "Doe"
-    totalprice: 1000
-    depositpaid: true
-    bookingdates:
-      checkin: "2024-03-15"
-      checkout: "2024-03-20"
-    additionalneeds: "WiFi"
-
 - case_name: "正向-价格为0创建预订"
   expected_code: 200
   data:
@@ -72,7 +61,7 @@
       checkout: "2024-07-31"
     additionalneeds: "总统套房"
 
-- case_name: "正向-firstname为空创建预订"
+- case_name: "正向-firstname为空字符串创建预订"
   expected_code: 200
   data:
     firstname: ""
@@ -82,18 +71,6 @@
     bookingdates:
       checkin: "2024-08-01"
       checkout: "2024-08-03"
-
-- case_name: "正向-姓名带特殊字符创建预订"
-  expected_code: 200
-  data:
-    firstname: "张@三#"
-    lastname: "测$试%"
-    totalprice: 300
-    depositpaid: true
-    bookingdates:
-      checkin: "2024-09-01"
-      checkout: "2024-09-05"
-    additionalneeds: "特殊字符测试"
 
 - case_name: "反向-缺少必填字段lastname"
   expected_code: 500

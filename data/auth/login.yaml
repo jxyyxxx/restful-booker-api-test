@@ -1,5 +1,5 @@
 # ============================================================
-# 登录接口测试数据（共 14 条）
+# 登录接口测试数据（共 12 条）
 # 对应测试用例：testcases/auth/test_login.py
 # 字段说明：
 #   case_name: 用例名称（会自动作为测试报告里的用例名）
@@ -9,8 +9,11 @@
 #   expected_success: 预期是否登录成功（true/false）
 # 设计说明：
 #   restful-booker 的 /auth 无论成功失败都返回 200，失败时响应体是 {"reason": "Bad credentials"}，
-#   所以反向用例要断言 expected_code=200 + expected_success=false（用例里进一步校验 reason 字段）。
-#   每条数据都必须对应一个不同的场景（等价类 / 边界值 / 异常输入），不要用重复数据凑条数。
+#   所以反向用例断言 expected_code=200 + expected_success=false，再由用例校验 reason 且 token 不存在。
+#   服务端是 `=== "admin" && === "password123"` 的严格比较：
+#     - 不做 trim   → 首尾空格会失败（和创建接口会 trim 形成对照）
+#     - 区分大小写  → Admin / PASSWORD123 会失败
+#   每种输入只保留一条代表数据，同义场景（换一个不存在的用户名）不重复堆条数。
 # ============================================================
 
 - case_name: "正向-登录成功"
@@ -25,31 +28,13 @@
   expected_code: 200
   expected_success: false
 
-- case_name: "反向-密码错误-简单密码"
-  username: "admin"
-  password: "123456"
-  expected_code: 200
-  expected_success: false
-
-- case_name: "反向-密码错误-空字符串密码"
+- case_name: "反向-密码为空白字符"
   username: "admin"
   password: "   "
   expected_code: 200
   expected_success: false
 
-- case_name: "反向-用户名为空"
-  username: ""
-  password: "password123"
-  expected_code: 200
-  expected_success: false
-
-- case_name: "反向-用户名为空格"
-  username: "   "
-  password: "password123"
-  expected_code: 200
-  expected_success: false
-
-- case_name: "反向-密码为空"
+- case_name: "反向-密码为空字符串"
   username: "admin"
   password: ""
   expected_code: 200
@@ -61,38 +46,44 @@
   expected_code: 200
   expected_success: false
 
-- case_name: "反向-用户名不存在-testuser"
-  username: "testuser"
-  password: "password123"
-  expected_code: 200
-  expected_success: false
-
-- case_name: "反向-用户名不存在-guest"
-  username: "guest"
-  password: "password123"
-  expected_code: 200
-  expected_success: false
-
 - case_name: "反向-用户名和密码都错误"
   username: "wronguser"
   password: "wrongpwd"
   expected_code: 200
   expected_success: false
 
-- case_name: "反向-用户名带特殊字符"
-  username: "admin@#$%"
+- case_name: "反向-用户名为空字符串"
+  username: ""
   password: "password123"
   expected_code: 200
   expected_success: false
 
-- case_name: "反向-超长用户名"
-  username: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+- case_name: "反向-用户名为空白字符"
+  username: "   "
   password: "password123"
   expected_code: 200
   expected_success: false
 
-- case_name: "反向-超长密码"
+- case_name: "反向-用户名首尾带空格"
+  username: " admin "
+  password: "password123"
+  expected_code: 200
+  expected_success: false
+
+- case_name: "反向-用户名大小写不同"
+  username: "Admin"
+  password: "password123"
+  expected_code: 200
+  expected_success: false
+
+- case_name: "反向-密码大小写不同"
   username: "admin"
-  password: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  password: "PASSWORD123"
+  expected_code: 200
+  expected_success: false
+
+- case_name: "反向-用户名为 null"
+  username: null
+  password: "password123"
   expected_code: 200
   expected_success: false
