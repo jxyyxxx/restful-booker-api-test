@@ -1,0 +1,8 @@
+[2026-11-25 07:54:54] [INFO] ========== 开始执行用例：test_create_trims_names ==========
+[2026-11-25 07:54:54] [INFO] 发送请求：POST http://localhost:3001/booking
+[2026-11-25 07:54:54] [INFO] 响应状态码：200，耗时：0.001s
+[2026-11-25 07:54:54] [INFO] 发送请求：GET http://localhost:3001/booking/19
+[2026-11-25 07:54:54] [INFO] 响应状态码：200，耗时：0.001s
+[2026-11-25 07:54:54] [INFO] 发送请求：DELETE http://localhost:3001/booking/19
+[2026-11-25 07:54:54] [INFO] 响应状态码：201，耗时：0.002s
+[2026-11-25 07:54:54] [INFO] 用例执行完成：test_create_trims_names
