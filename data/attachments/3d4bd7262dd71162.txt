@@ -1,0 +1,6 @@
+[2026-11-28 07:13:27] [INFO] ========== 开始执行用例：test_create_invalid_date ==========
+[2026-11-28 07:13:27] [INFO] 发送请求：POST http://localhost:3001/booking
+[2026-11-28 07:13:27] [INFO] 响应状态码：200，耗时：0.002s
+[2026-11-28 07:13:27] [INFO] 发送请求：DELETE http://localhost:3001/booking/22
+[2026-11-28 07:13:27] [INFO] 响应状态码：201，耗时：0.001s
+[2026-11-28 07:13:27] [INFO] 用例执行完成：test_create_invalid_date
